@@ -189,7 +189,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
     XtWX <- t(X)%*%WX
     WQ <- W - WX%*%solve(XtWX,t(WX))
     rss <- as.numeric(t(y) %*% WQ %*% y)
-    ldet <- sum(log(La.eigen(WQ,symmetric=TRUE,only.values=TRUE,method="dsyevr")$values[1:rankQ]))
+    ldet <- sum(log(eigen(WQ,symmetric=TRUE,only.values=TRUE)$values[1:rankQ]))
     
     ## REML LLIK
     rllik1 <- ldet/2 - rss/2
@@ -429,7 +429,7 @@ reml <- function(lambda, y, X, V0, V1,print.level=0){
       WQ <- W - WX%*%solve(XtWX,t(WX))
       rss <- t(y) %*% WQ %*% y
       logdetrss <- sum(log(eigen(rss)$values[1:q]))
-      eVals <- La.eigen(WQ,symmetric=TRUE,only.values=TRUE,method="dsyevr")$values[1:rank]
+      eVals <- eigen(WQ,symmetric=TRUE,only.values=TRUE)$values[1:rank]
       ldet <- sum(log(eVals))
       llik[i] <- Re(ldet*q/2 - rank*logdetrss/2)
     }

@@ -120,7 +120,8 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
   library("regress")
   data(Oats)
   names(Oats) <- c("B","V","N","Y")
-  
+  Oats$N <- as.factor(Oats$N)
+
   ## Using regress
   oats.reg <- regress(Y~N+V,~B+I(B:V),identity=TRUE,print.level=1,data=Oats)
   summary(oats.reg)

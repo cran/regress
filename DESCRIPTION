@@ -1,6 +1,6 @@
 Package: regress
-Version: 0.1
-Date: 2004-06-11
+Version: 0.2
+Date: 2004-06-21
 Title: Fitting Gaussian Linear Models where the Covariance Structure is a Linear Combination of Known Matrices by Maximising the Residual Log Likelihood
 Author: David Clifford <clifford@galton.uchicago.edu>, Peter McCullagh <pmcc@galton.uchicago.edu>
 Maintainer: David Clifford <clifford@galton.uchicago.edu>
