@@ -1,0 +1,2 @@
+regress			Algorithm for fitting Gaussian Linear Models by REML
+summary.regress		Algorithm to summarise output from regress
