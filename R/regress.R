@@ -121,7 +121,6 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       if(print.level>=1) cat("\n")
       reg.obj <- reml(gamVals,y,X,V[[1]],V[[2]],print.level=print.level)
       llik <- reg.obj$llik
-      llik <- llik-basellik
       llik <- as.real(llik)
       if(print.level>=2) cat(llik,"\n")
       gam <- gamVals[llik==max(llik)]
@@ -137,7 +136,6 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
     ## it tends to take huge steps when starting at gam=0.9999
     if(gam==0.9999) {
       fraction <- fraction/100
-      frac.inc <- frac.inc/10
       maxcyc <- maxcyc*10
     }
     if(print.level>=1) cat(c("start algorithm at",round(start,4),"\n"))
@@ -295,7 +293,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
 
   predicted <- NULL
   if(identity) {
-    gam <- sigma[k]  ## coefficient if identity, last variance term
+    gam <- sigma[k]  ## coefficient of identity, last variance term
     if(pos[k]) gam <- exp(gam)
     
     predicted <- fitted.values + (Sigma - gam*In) %*% W%*%(y - fitted.values)
