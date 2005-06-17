@@ -81,6 +81,9 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   if(missing(pos)) pos <- rep(0,k)
   pos <- c(pos,rep(0,k))
   pos <- pos[1:k]
+
+  ## Force pos to be binary - June 17th 2005
+  pos <- 1-(pos==0)
   
   for(i in 1:length(V))
     {
@@ -299,9 +302,28 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
     predicted <- fitted.values + (Sigma - gam*In) %*% W%*%(y - fitted.values)
   }
 
+  ## scale dictated by pos
+  sigma.cov <- (A.svd[1:k, 1:k] * 2)
+  
+  ## Last Step:  June 17th 2005
+  ## Conver the estimates for the variance parameters, their standard
+  ## errors etc to the usual scale
+
+  for(i in 1:k) if(pos[i]) sigma[i] <- exp(sigma[i])
+
+  FI <- A/2
+  
+  ## convert FI using pos
+  FI.c <- matrix(0,dim(FI)[1],dim(FI)[2])
+  for(i in 1:dim(FI)[1])
+    for(j in 1:dim(FI)[2])
+      FI.c[i,j] <- FI[i,j]/(((sigma[i]-1)*pos[i]+1)*((sigma [j]-1)*pos[j]+1))
+  
+  sigma.cov <- ginv(FI.c)
+  
   result <- list(trace=llik, llik=llik[cycle, 1], cycle=cycle,
                  rdf=rankQ, beta=beta, beta.cov=beta.cov, beta.se=beta.se,
-                 sigma=sigma[1:k], sigma.cov=(A.svd[1:k, 1:k] * 2), W=W, Q=Q,
+                 sigma=sigma[1:k], sigma.cov=sigma.cov[1:k,1:k], W=W, Q=Q,
                  fitted=fitted.values, predicted=predicted, pos=pos,
                  Vnames=Vcoef.names)
   class(result) <- "regress"
@@ -353,30 +375,17 @@ summary.regress <- function(object, digits=3, fixed.effects=T,...)
     } else {
       cat("\nLinear Coefficients: not shown\n\n")
     }
-    
-    if(sum(object$pos)==0) {
-      var.coefficients <- cbind(object$sigma,sqrt(diag(as.matrix(object$sigma.cov))))
-      ##row.names(var.coefficients) <- paste(space.var,"coef.",c(1:length(object$sigma)),sep="")
-      row.names(var.coefficients) <- paste(space.var,object$Vnames,sep="")
-      dimnames(var.coefficients)[[2]] <- c("Estimate","Std. Error")
-      var.coefficients <- round(var.coefficients,digits)
-      cat("Variance Coefficients:\n")
-      print(var.coefficients)
-      cat("\n")
-    } else {
-      var.coefficients <- cbind(object$sigma, object$sigma - 2*sqrt(diag(as.matrix(object$sigma.cov))), object$sigma + 2*sqrt(diag(as.matrix(object$sigma.cov))))
-      for(i in 1:length(object$pos))
-        {
-          if(object$pos[i]) var.coefficients[i,] <- exp(var.coefficients[i,])
-        }
-      ##row.names(var.coefficients) <- paste(space.var,c(1:length(object$sigma)),sep="")
-      row.names(var.coefficients) <- paste(space.var,object$Vnames,sep="")
-      dimnames(var.coefficients)[[2]] <- c("Estimate","Conf. Low.", "Conf. Upp.")
-      var.coefficients <- round(var.coefficients,digits)
-      cat("Variance Coefficients:\n")
-      print(var.coefficients)
-      cat("\n")
-    }
+
+    ## New version of regress automatically converts to the linear
+    ## scale - as if pos was a vector of zeroes
+
+    var.coefficients <- cbind(object$sigma,sqrt(diag(as.matrix(object$sigma.cov))))
+    row.names(var.coefficients) <- paste(space.var,object$Vnames,sep="")
+    dimnames(var.coefficients)[[2]] <- c("Estimate","Std. Error")
+    var.coefficients <- round(var.coefficients,digits)
+    cat("Variance Coefficients:\n")
+    print(var.coefficients)
+    cat("\n")
   }
 
 ## when two matrices are passed to regress this is also called

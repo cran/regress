@@ -73,10 +73,10 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
   variance component scale.  Use \code{pos} to force certain variance
   components to be positive.
 
-  NOTE: The returned values in the regress object are on the variance
-  parameter scale.  The summary of the regress object takes this into
-  consideration and all outputted information is on the variance
-  component scale.}
+  NOTE: The final stage of the algorithm converts the estimates of the
+  variance components and the Fisher Information to the usual linear
+  scale, i.e. as if \code{pos} were a vector of zeroes.
+  }
 
 \value{
   \item{trace}{Matrix with one row for each iteration of algorithm.
@@ -90,9 +90,9 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
   \item{beta.cov}{Estimate of the covariance structure for terms in
     beta.}
   \item{beta.se}{Standard errors for terms in beta.}
-  \item{sigma}{Variance parameter estimates, interpretation depends on
-    value of \code{pos} (on log scale if pos > 0).}
-  \item{sigma.cov}{Covariance matrix for the variance parameter
+  \item{sigma}{Variance component estimates, interpretation does not depend on
+    value of \code{pos}}
+  \item{sigma.cov}{Covariance matrix for the variance component
     estimates based on the Fisher Information at the point of
     convergence.}
   \item{W}{Inverse of covariance matrix at point of convergence.}
