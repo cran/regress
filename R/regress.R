@@ -1,4 +1,4 @@
-regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data){
+regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level=NULL){
 
   ## Vformula can just be something like ~ V0 + V1
   ## or leave it out or Vformula=NULL
@@ -6,12 +6,23 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   ## for random effects and random interactions for factors A and B include
   ## ~ A + B + I(A:B)
 
+  if(!is.null(print.level)) {
+    cat("\nWarning: print.level has been replaced by verbose and has been deprecated.\nIt will be removed in the next version of regress\n\n")
+    verbose <- print.level
+  }
+  
   if(missing(data)) data <- environment(formula)
   mf <- model.frame(formula,data=data,na.action=na.pass)
   mf <- eval(mf,parent.frame())
   y <- model.response(mf)
 
   X <- model.matrix(formula,data=data)
+
+  model <- list()
+  ##model$formula <- formula
+  ##model$Vformula <- Vformula
+  model <- c(model,mf)
+  
   if(missing(Vformula)) Vformula <- NULL
 
   if(!is.null(Vformula))
@@ -65,17 +76,26 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
         }
     }
 
-  In <- diag(rep(1,length(y)),length(y) ,length(y))
+  In <- diag(rep(1,n),n,n)
 
   if(identity) {
     ##if(k) for(i in k:1) V[[i+1]] <- V[[i]]
     ##V[[1]] <- In
-    V[[k+1]] <- In
+    V[[k+1]] <- as.factor(1:n)
+    names(V)[k+1] <- "In"
     k <- k+1
+    
     ##Vcoef.names <- c("Id",Vcoef.names)
-    Vcoef.names <- c(Vcoef.names,"I")
+    Vcoef.names <- c(Vcoef.names,"In")
+    Vformula <- as.character(Vformula)
+    Vformula[2] <- paste(Vformula[2],"+In")
+    Vformula <- as.formula(Vformula)
   }
 
+  model <- c(model,V)
+  model$formula <- formula
+  model$Vformula <- Vformula
+  
   ## specify which parameters are positive and which are negative
   ## pos = c(1,1,0) means first two parameters are positive, third is either
   if(missing(pos)) pos <- rep(0,k)
@@ -119,16 +139,16 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       gamVals <- 0.5
     }
     if(length(gamVals)>1) {
-      if(print.level>=1) cat("Evaluating the llik at gamma = \n")
-      if(print.level>=1) cat(gamVals)
-      if(print.level>=1) cat("\n")
-      reg.obj <- reml(gamVals,y,X,V[[1]],V[[2]],print.level=print.level)
+      if(verbose>=1) cat("Evaluating the llik at gamma = \n")
+      if(verbose>=1) cat(gamVals)
+      if(verbose>=1) cat("\n")
+      reg.obj <- reml(gamVals,y,X,V[[1]],V[[2]],verbose=verbose)
       llik <- reg.obj$llik
       llik <- as.real(llik)
-      if(print.level>=2) cat(llik,"\n")
+      if(verbose>=2) cat(llik,"\n")
       gam <- gamVals[llik==max(llik)]
       gam <- gam[1]
-      if(print.level>=2) cat("MLE is near",gam,"and llik =",max(llik),"there\n")
+      if(verbose>=2) cat("MLE is near",gam,"and llik =",max(llik),"there\n")
     }
     if(length(gamVals)==1) {
       ## go straight to the Newton Raphson at gamVals
@@ -141,7 +161,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       fraction <- fraction/100
       maxcyc <- maxcyc*10
     }
-    if(print.level>=1) cat(c("start algorithm at",round(start,4),"\n"))
+    if(verbose>=1) cat(c("start algorithm at",round(start,4),"\n"))
   }
 
   sigma <- start
@@ -161,7 +181,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
     
     sigma <- sigma+fraction*x
 
-    if(print.level>=1) {
+    if(verbose>=1) {
       cat(cycle, " ")
       for(i in 1:k) {
         if(pos[i]) {
@@ -198,7 +218,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
     ## MARGINAL LLIK BASED ON RESIDUAL CONFIGURATION STATISTIC
     rllik2 <- ldet/2 - rankQ * log(rss)/2
     
-    if(print.level) cat("REML =",rllik1,"\n")
+    if(verbose) cat("REML =",rllik1,"\n")
 
     ## change in REML llik
     if(cycle > 1) delta <- rllik1 - rllik0
@@ -238,7 +258,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       }
     
     stats <- c(stats, rllik1, rllik2, sigma[1:k], x[1:k])
-    if(print.level==-1) {
+    if(verbose==-1) {
       cat(c(rllik1, rllik2, sigma[1:k], x[1:k]),"\n")
     }
 
@@ -247,7 +267,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
 
     if(qr(A)$rank < k){
       if(cycle==1) {
-        if(print.level) {
+        if(verbose) {
           cat("Warning: Non identifiable dispersion model\n")
           ##print(round(A,6))
           for(i in 1:k) {
@@ -269,7 +289,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   if(cycle==maxcyc)
     {
       ## issue a warning
-      if(print.level) cat("WARNING:  maximum number of cycles reached before convergence\n")
+      if(verbose) cat("WARNING:  maximum number of cycles reached before convergence\n")
     }
   y
   
@@ -320,12 +340,13 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       FI.c[i,j] <- FI[i,j]/(((sigma[i]-1)*pos[i]+1)*((sigma [j]-1)*pos[j]+1))
   
   sigma.cov <- ginv(FI.c)
+
   
   result <- list(trace=llik, llik=llik[cycle, 1], cycle=cycle,
                  rdf=rankQ, beta=beta, beta.cov=beta.cov, beta.se=beta.se,
                  sigma=sigma[1:k], sigma.cov=sigma.cov[1:k,1:k], W=W, Q=Q,
                  fitted=fitted.values, predicted=predicted, pos=pos,
-                 Vnames=Vcoef.names)
+                 Vnames=Vcoef.names, formula=formula, Vformula=Vformula, model=model)
   class(result) <- "regress"
   result
 }
@@ -351,11 +372,13 @@ ginv <- function (X, tol = sqrt(.Machine$double.eps))
                             t(Xsvd$u[, Positive, drop = FALSE]))
 }
 
-summary.regress <- function(object, digits=3, fixed.effects=T,...)
+summary.regress <- function(object, ...) object
+
+print.regress <- function(x, digits=3, fixed.effects=T, ...)
   {
-    cat("\nMaximised Residual Log Likelihood is",round(object$llik,digits),"\n",sep=" ")
-    indent.lin <- max(nchar(dimnames(object$beta)[[1]]))
-    indent.var <- max(nchar(object$Vnames))
+    cat("\nMaximised Residual Log Likelihood is",round(x$llik,digits),"\n",sep=" ")
+    indent.lin <- max(nchar(dimnames(x$beta)[[1]]))
+    indent.var <- max(nchar(x$Vnames))
     indent <- max(indent.lin,indent.var)
 
     extra.space <- ""
@@ -364,12 +387,12 @@ summary.regress <- function(object, digits=3, fixed.effects=T,...)
     space.lin <- extra.space
     for(i in 0:(indent-indent.lin)) space.lin <- paste(space.lin," ",sep="")
     
-    coefficients <- cbind(object$beta,object$beta.se)
+    coefficients <- cbind(x$beta,x$beta.se)
     dimnames(coefficients)[[2]] <- c("Estimate","Std. Error")
     coefficients <- round(coefficients,digits)
     if(fixed.effects) {
       cat("\nLinear Coefficients:\n")
-      row.names(coefficients) <- paste(space.lin,dimnames(object$beta)[[1]],sep="")
+      row.names(coefficients) <- paste(space.lin,dimnames(x$beta)[[1]],sep="")
       print(coefficients)
       cat("\n")
     } else {
@@ -379,8 +402,8 @@ summary.regress <- function(object, digits=3, fixed.effects=T,...)
     ## New version of regress automatically converts to the linear
     ## scale - as if pos was a vector of zeroes
 
-    var.coefficients <- cbind(object$sigma,sqrt(diag(as.matrix(object$sigma.cov))))
-    row.names(var.coefficients) <- paste(space.var,object$Vnames,sep="")
+    var.coefficients <- cbind(x$sigma,sqrt(diag(as.matrix(x$sigma.cov))))
+    row.names(var.coefficients) <- paste(space.var,x$Vnames,sep="")
     dimnames(var.coefficients)[[2]] <- c("Estimate","Std. Error")
     var.coefficients <- round(var.coefficients,digits)
     cat("Variance Coefficients:\n")
@@ -392,7 +415,7 @@ summary.regress <- function(object, digits=3, fixed.effects=T,...)
 ## to evaluate the REML at certain values of gamma and find a
 ## good place to start the regress algorithm
 
-reml <- function(lambda, y, X, V0, V1,print.level=0){
+reml <- function(lambda, y, X, V0, V1,verbose=0){
 
   if(is.null(dim(y)))
     {
@@ -423,10 +446,10 @@ reml <- function(lambda, y, X, V0, V1,print.level=0){
   n <- dim(X)[1]
   if(missing(V0)) V0 <- diag(rep(1, n), n, n)
   rank <- n - qr$rank
-  ##if(print.level==1) cat("n-p =",n,"-",qr$rank,"=",rank,"\n")
+  ##if(verbose==1) cat("n-p =",n,"-",qr$rank,"=",rank,"\n")
   for(i in 1:length(lambda))
     {
-      if(print.level>=2) cat(lambda[i],"\n")
+      if(verbose>=2) cat(lambda[i],"\n")
       
       Sigma <- (1-lambda[i])*V0 + lambda[i] * V1
       WX <- solve(Sigma,cbind(X,In))

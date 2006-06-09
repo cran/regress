@@ -1,2 +1,4 @@
-regress			Algorithm for fitting Gaussian Linear Models by REML
-summary.regress		Algorithm to summarise output from regress
+print.regress           Print a summary of regress output
+regress                 Fit a Gaussian Linear Model with Linear
+                        Covariance Structure
+summary.regress         Summarise a Gaussian Linear Model from regress

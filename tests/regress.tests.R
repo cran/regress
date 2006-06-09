@@ -7,7 +7,7 @@ data(Oats)
 names(Oats) <- c("B","V","N","Y")
 Oats$N <- as.factor(Oats$N)
 
-oats.reg <- regress(Y~N+V,~B+I(B:V),identity=TRUE,print.level=1,data=Oats)
+oats.reg <- regress(Y~N+V,~B+I(B:V),identity=TRUE,verbose=1,data=Oats)
 summary(oats.reg)
 
 ## Test 2, Multivariate Model
@@ -31,5 +31,5 @@ sig1 <- kronecker(V1,diag(1,n))
 sig2 <- kronecker(V2,diag(1,n))
 gam <- kronecker(V3,diag(1,n))
 
-reg.obj <- regress(y~X-1,~sig1+sig2+gam,identity=F,print.level=1,start=c(10,10,5))
+reg.obj <- regress(y~X-1,~sig1+sig2+gam,identity=F,verbose=1,start=c(10,10,5))
 summary(reg.obj)

@@ -1,1 +1,1 @@
-export(regress,summary.regress)
+export(regress,summary.regress,print.regress)

@@ -5,15 +5,17 @@
 
 \description{Summarises output from \code{regress}.}
 
-\synopsis{summary.regress(object, digits=3, fixed.effects=T,...)}
+\synopsis{summary.regress(object, ...)}
 
-\usage{summary.regress(object,digits=4,fixed.effects=F)}
+\usage{summary.regress(object, ...)}
 
 \arguments{
   \item{object}{Output from \code{regress}.}
-  \item{digits}{Number of significant decimal places to print.}
-  \item{fixed.effects}{Logical, include the summary of fixed effects also.}
+  \item{...}{additional parameters as needed}
 }
+
+\details{ All summary information included in the \code{regress}
+  function itself.  This function is included for completeness.  }
 
 \author{David Clifford}
 

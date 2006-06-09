@@ -1,9 +1,7 @@
 \name{regress}
 \alias{regress}
 
-\title{Fit a Gaussian Linear Model in which the Covariance Structure is
-a Linear Combination of Known Matrices by Maximising the Residual Log
-Likelihood}
+\title{Fit a Gaussian Linear Model with Linear Covariance Structure}
 
 \description{Fits Gaussian linear models in which the covariance
   structure can be expressed as a linear combination of known matrices.
@@ -13,11 +11,10 @@ Likelihood}
   Uses a Newton-Raphson algorithm to maximise the residual log
   likelihood.}
 
-\synopsis{regress(formula, Vformula, identity=TRUE, start=NULL,
-fraction=1, pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
+\synopsis{regress(formula, Vformula, identity=TRUE, start=NULL, fraction=1, pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
 
 \usage{regress(formula, Vformula, identity=TRUE, start=NULL, fraction=1,
-pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
+pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
 
 \arguments{
   \item{formula}{ a symbolic description of the model to be fitted. The
@@ -37,7 +34,7 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
     matrices in the covariance structure.  Indicates which variance
     components are positive (TRUE) and which are real (FALSE).
     Important for multivariate problems.}
-  \item{print.level}{Controls level of time output, takes values 0, 1 or
+  \item{verbose}{Controls level of time output, takes values 0, 1 or
     2, Default is 0, level 1 gives parameter estimates and value of log
     likelihood at each stage.}
   \item{gamVals}{When k=2, the marginial log likelihood based on the
@@ -57,6 +54,7 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
   \item{data}{an optional data frame containing the variables in the model.
     By default the variables are taken from 'environment(formula)',
     typically the environment from which 'regress' is called.}
+  \item{print.level}{Deprecated}
 }
 
 \details{As the code is running it outputs the variance components, and
@@ -76,6 +74,11 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
   NOTE: The final stage of the algorithm converts the estimates of the
   variance components and the Fisher Information to the usual linear
   scale, i.e. as if \code{pos} were a vector of zeroes.
+
+  NOTE: No \code{predict} functionality is provided with regress due to
+  some ambiguity.  Are we predicting conditional on the observed data.
+  Are we predicting observations from the fitted model itself?  It is
+  all normal anyway so it is straightforward, see our paper on regress.
   }
 
 \value{
@@ -104,12 +107,19 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
   $\Sigma = V1 + V2$ at point of convergence then y = V1 W y + V2 W y is
   the decomposition.}
   \item{pos}{Indicator for the scale for each variance parameter.}
-  \item{Vnames}{Names associated with each variance component, used in \code{summary}.}
+  \item{Vnames}{Names associated with each variance component, used in
+    \code{print.regress}.}
+  \item{formula}{Copy of formula}
+  \item{Vformula}{Updated version of Vformula to include identity if
+    necessary}
+  \item{model}{Response, covariates and matrices/factors to be used for
+    model fitting}
 }
 
 \references{
   G. Tunnicliffe Wilson, "On the use of marginal likelihood in time
   series model estimation."  JRSS B, Vol 51, No 1, 1989, 15-27.
+  D. Clifford and P. McCullagh, "The regress Library" R News.
 }
 
 \author{David Clifford, Peter McCullagh.}
@@ -117,13 +127,13 @@ pos, print.level=0, gamVals=NULL, maxcyc=50, tol=1e-4, data)}
 \examples{
   ## Example of Random Effects model from Venables and Ripley, page 205
   library("nlme")
-  library("regress")
+  ##library("regress")
   data(Oats)
   names(Oats) <- c("B","V","N","Y")
   Oats$N <- as.factor(Oats$N)
 
   ## Using regress
-  oats.reg <- regress(Y~N+V,~B+I(B:V),identity=TRUE,print.level=1,data=Oats)
+  oats.reg <- regress(Y~N+V,~B+I(B:V),identity=TRUE,verbose=1,data=Oats)
   summary(oats.reg)
 
   ## Using lme
