@@ -99,12 +99,12 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
     estimates based on the Fisher Information at the point of
     convergence.}
   \item{W}{Inverse of covariance matrix at point of convergence.}
-  \item{Q}{$I - X^T (X^T W X)^{-1}X^T W$ at point of convergence.}
-  \item{fitted}{$X \beta$, the fitted values.}
+  \item{Q}{$I - X^T (X^T W X)^-1 X^T W$ at point of convergence.}
+  \item{fitted}{$X beta$, the fitted values.}
   \item{predicted}{If \code{identity=TRUE}, decompose y into the part
   associated with the identity and that assosicated with the rest of the
   variance structure, this second part is the predicted values.  If
-  $\Sigma = V1 + V2$ at point of convergence then y = V1 W y + V2 W y is
+  $Sigma = V1 + V2$ at point of convergence then y = V1 W y + V2 W y is
   the decomposition.}
   \item{pos}{Indicator for the scale for each variance parameter.}
   \item{Vnames}{Names associated with each variance component, used in
