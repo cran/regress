@@ -1,0 +1,7 @@
+437d6f393d3e130f08d99e9720bca2ec *DESCRIPTION
+1f243a742ec225077fadf9020f443176 *NAMESPACE
+3195695aa3c68000676b3d92a13d960c *R/regress.R
+8b47b3724b1d2635674fad4680e2c116 *man/print.regress.Rd
+6f7f66a63c4f3a920a9bb00cf23db511 *man/regress.Rd
+02ea1e6f61598b0e796c2f6b4515d3e1 *man/summary.regress.Rd
+497d160acca043231f438169de001a77 *tests/regress.tests.R

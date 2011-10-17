@@ -65,7 +65,7 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
   parameter space over which the Newton-Raphson algorithm is run.  I can
   force a component to be positive be defining the corresponding variance
   parameter on the log scale.
-  
+
   All output to the screen is for variance components (i.e. the
   multiples of the matrices).  Values for \code{start} are on the
   variance component scale.  Use \code{pos} to force certain variance
@@ -127,7 +127,7 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
 \examples{
   ## Example of Random Effects model from Venables and Ripley, page 205
   library("nlme")
-  ##library("regress")
+  library("regress")
   data(Oats)
   names(Oats) <- c("B","V","N","Y")
   Oats$N <- as.factor(Oats$N)
@@ -139,6 +139,7 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
   ## Using lme
   oats.lme <- lme(Y~N+V,random=~1|B/V,data=Oats,method="REML")
   summary(oats.lme)
+
 }
 
 \keyword{regression}

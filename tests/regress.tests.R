@@ -31,5 +31,5 @@ sig1 <- kronecker(V1,diag(1,n))
 sig2 <- kronecker(V2,diag(1,n))
 gam <- kronecker(V3,diag(1,n))
 
-reg.obj <- regress(y~X-1,~sig1+sig2+gam,identity=F,verbose=1,start=c(10,10,5))
+reg.obj <- regress(y~X-1,~sig1+sig2+gam,identity=FALSE,verbose=1,start=c(10,10,5))
 summary(reg.obj)
