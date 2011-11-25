@@ -1,4 +1,7 @@
-regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level=NULL){
+regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
+                    start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
+                    maxcyc=50, tol=1e-4, data,
+                    fraction=NULL,print.level=NULL){
 
   ## Vformula can just be something like ~ V0 + V1
   ## or leave it out or Vformula=NULL
@@ -9,6 +12,9 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   if(!is.null(print.level)) {
     cat("\nWarning: print.level has been replaced by verbose and has been deprecated.\nIt will be removed in the next version of regress\n\n")
     verbose <- print.level
+  }
+  if(!is.null(print.level)) {
+      cat("\nWarning: fraction has been deprecated and replaced by taper - a vector of values from 0 to 1 giving a unique fraction for each step of the Newton Raphson algorithm.\n")
   }
 
   if(missing(data)) data <- environment(formula)
@@ -57,6 +63,41 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       Xcolnames <- Xcolnames[qr$pivot[1:qr$rank]]
   } else {
       cat("\nERROR: X has rank 0\n\n")
+  }
+
+  if(missing(kernel)){
+      K <- X
+      colnames(K) <- Xcolnames
+      reml <- TRUE
+      kernel<-NULL
+  } else {
+      if(length(kernel)==1 && kernel>0){
+          K <- matrix(rep(1, n), n, 1)
+          colnames(K) <- c("1")
+      }
+      if(length(kernel)==1 && kernel<=0) {
+          K <- Kcolnames <- NULL
+          KX <- X
+          rankQK <- n
+      }
+      if(length(kernel) > 1) {
+          ##K is a matrix I hope
+          K <- kernel[isNA==F,]
+      }
+      reml <- FALSE
+  }
+
+  if(!is.null(K)){
+      Kcolnames <- colnames(K)
+      qr <- qr(K)
+      rankQK <- n - qr$rank
+      if(qr$rank == 0) K <- NULL else {
+          K <- matrix(K[, qr$pivot[1:qr$rank]],n,qr$rank)
+          Kcolnames <- Kcolnames[qr$pivot[1:qr$rank]]
+          KX <- cbind(K, X)	# Spanning K + X: Oct 12 2011
+          qr <- qr(KX)
+          KX <- matrix(KX[, qr$pivot[1:qr$rank]],n,qr$rank)	# basis of K+X
+      }
   }
 
   if(missing(maxcyc)) maxcyc <- 50
@@ -113,10 +154,12 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       {
           if(is.factor(V[[i]])){
               Vi <- model.matrix(~V[[i]]-1)
+              colnames(Vi) <- levels(V[[i]])
               Z[[i]] <- Vi ## list of model matrices
               V[[i]] <- tcrossprod(Vi)
           }
       }
+      names(Z) <- names(V)
   } else {
       for(i in 1:length(V))
       {
@@ -126,6 +169,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
               V[[i]] <- Vi
           }
       }
+      Z <- V ## So it is always defined
   }
   ## So V is always a list of variance coavriance matrices, Z contains
   ## the model matrices of factors when we need to invoke the Sherman
@@ -140,6 +184,14 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   stats <- rep(0, 0)
 
   ## START ALGORITHM
+
+  if(missing(taper)){
+      taper <- rep(0.9, maxcyc)
+      if(missing(start) && k>1) taper[1:2] <- c(0.5, 0.7)
+  } else {
+      taper <- pmin(abs(taper), 1)
+      if((l <- length(taper)) < maxcyc) taper <- c(taper, rep(taper[l], maxcyc-l))
+  }
 
   if(!is.null(start)) {
       ## pad start with zeros if required
@@ -176,7 +228,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       start <- c(1-gam,gam)*reg.obj$rms
       ## it tends to take huge steps when starting at gam=0.9999
       if(gam==0.9999) {
-          fraction <- fraction/100
+          taper[1] <- taper[1]/100
           maxcyc <- maxcyc*10
       }
       if(verbose>=1) cat(c("start algorithm at",round(start,4),"\n"))
@@ -211,10 +263,10 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       }
   }
 
-  sigma <- start
+  sigma <- coef <- start
   ## reparameterise so everything will get into the correct spot after exp
-  ind <- which(pos)
-  if(length(ind)) sigma[ind] <- log(start[ind])
+  coef[pos] <- log(sigma[pos])
+  coef[!pos] <- sigma[!pos]
 
   ## Set the memory requirements beforehand
   T <- vector("list", length=k)
@@ -222,74 +274,61 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
 
   for(cycle in 1:maxcyc){
 
-      ## newton-raphson step
-      ## at the end of the iteration x will be -l'(sigma)/l''(sigma)
-      ## hence we add instead of subtract
-      ## fraction controls the proportion of each step to take
-      ## for some reason 0.5 works very well
-
-      if(all(pos==1)) x <- sign(x) * pmin(abs(x),5) ## limit maximum shift we can take in one step to 5 units on log scale
-      sigma <- sigma+fraction*x
-
+      ## Limit how far out we go on the logarithmic scale
       ind <- which(pos)
       if(length(ind)) {
-          sigma[ind] <- pmin(sigma[ind],20)
-          sigma[ind] <- pmax(sigma[ind],-20) ## so on regular scale everything is between exp(-20) and exp(20)
+          coef[ind] <- pmin(coef[ind],20)
+          coef[ind] <- pmax(coef[ind],-20) ## so on regular scale everything is between exp(-20) and exp(20)
+          sigma[ind] <- exp(coef[ind])
       }
 
       if(verbose>=1) {
           cat(cycle, " ")
-          sigmaTemp <- sigma
-          ind <- which(pos)
-          if(length(ind)) sigmaTemp[ind] <- exp(sigmaTemp[ind])
-          cat(sigmaTemp)
+          ## cat(sigma)
       }
 
       ##Sigma <- matrix(0,dim(V[[1]])[1],dim(V[[1]])[2])
       if(!SWsolveINDICATOR) {
           Sigma <- 0
           ## can we get rid of this loop?
-          for(i in 1:k)
-          {
-              if(pos[i]) {
-                  Sigma <- Sigma + V[[i]]*exp(sigma[i])
-              } else {
-                  Sigma <- Sigma + V[[i]]*sigma[i]
+          for(i in 1:k) Sigma <- Sigma + V[[i]]*sigma[i]
 
-              }
-          }
-
-          cholesky <- try(chol(Sigma, pivot=FALSE), silent=TRUE)
-          if(class(cholesky) == "try-error" || min(diag(cholesky)) < 1e-9) return(1e+32)
-          W <- chol2inv(cholesky)
-          WX <- W %*% X
+          W <- solve(Sigma,In)
       } else {
-          ind <- which(pos)
-          sigmaTemp <- sigma
-          if(length(ind)) sigmaTemp[ind] <- exp(sigmaTemp[ind])
-          W <- SWsolve2(Z[1:(k-1)],sigmaTemp)
-          WX <- W %*% X
+          W <- SWsolve2(Z[1:(k-1)],sigma)
       }
 
-      ##WX <- solve(Sigma,cbind(X,In))
-      ##W <- WX[,(dim(X)[2]+1):dim(WX)[2]]
-      ##WX <- WX[,1:dim(X)[2]]
-      XtWX <- t(X)%*%WX
-      WQ <- W - WX%*%solve(XtWX,t(WX))
-      rss <- as.numeric(t(y) %*% WQ %*% y)
-      ldet <- sum(log(eigen(WQ,symmetric=TRUE,only.values=TRUE)$values[1:rankQ]))
+      if(is.null(K)) WQK <- W else {
+          WK <- W %*% K
+          WQK <- W - WK %*% solve(t(K)%*%WK, t(WK))
+      }
+      if(reml) WQX <- WQK else {
+          WX <- W %*% KX		# including the kernel (Oct 12 2011)
+          WQX <- W - WX %*% solve(t(KX)%*%WX, t(WX))
+      }
 
-      ## REML LLIK
-      rllik1 <- ldet/2 - rss/2
+      rss <- as.numeric(t(y) %*% WQX %*% y)
+      sigma <- sigma * rss/rankQK
+      coef[!pos] <- sigma[!pos]
+      coef[pos] <- log(sigma[pos])
+      WQK <- WQK * rankQK/rss
+      WQX <- WQX * rankQK/rss
+      rss <- rankQK ## looks bad but the rss is absorbed into WQK so the rss term comes out of eig below
 
-      ## MARGINAL LLIK BASED ON RESIDUAL CONFIGURATION STATISTIC
-      rllik2 <- ldet/2 - rankQ * log(rss)/2
-
-      if(verbose) cat(" REML =",rllik1,"\n")
-
-      ## change in REML llik
-      if(cycle > 1) delta <- rllik1 - rllik0
-      rllik0 <- rllik1
+      eig <- sort(eigen(WQK,symmetric=TRUE,only.values=TRUE)$values, decreasing=TRUE)[1:rankQK]
+      if(any(eig < 0)){
+          cat("error: Sigma is not pos def on contrasts: range(eig)=", range(eig), "\n")
+          WQK <- WQK + (tol - min(eig))*diag(nobs)
+          eig <- eig + tol - min(eig)
+      }
+      ldet <- sum(log(eig))
+      llik <- ldet/2 - rss/2
+      if(cycle == 1) llik0 <- llik
+      delta.llik <- llik - llik0
+      llik0 <- llik
+      if(verbose) cat("sigma =", sigma, "(scale-adjusted)\n")
+      if(verbose && reml) cat("resid llik =", llik, "delta.llik =", delta.llik, "\n")
+      if(verbose && !reml) cat("llik =", llik, "delta.llik =", delta.llik, "\n")
 
       ## now the fun starts, derivative and expected fisher info
       ## the 0.5 multiple is ignored, it is in both and they cancel
@@ -300,26 +339,26 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       ## derivatives are now D[[i]] = var.components[i]*V[[i]]
       var.components <- rep(1,k)
       ind <- which(pos)
-      if(length(ind)) var.components[ind] <- exp(sigma[ind])
+      if(length(ind)) var.components[ind] <- sigma[ind]
 
       ## Slow part - order k n-squared
       if(!SWsolveINDICATOR) {
           if(identity) {
-              T[[k]] <- WQ
+              T[[k]] <- WQK
               if(k>1) {
-                  for(ii in (k-1):1) T[[ii]] <- WQ %*% V[[ii]]
+                  for(ii in (k-1):1) T[[ii]] <- WQK %*% V[[ii]]
               }
           } else {
-              for(ii in 1:k) T[[ii]] <- WQ %*% V[[ii]]
+              for(ii in 1:k) T[[ii]] <- WQK %*% V[[ii]]
           }
       } else {
           if(identity) {
-              T[[k]] <- WQ
+              T[[k]] <- WQK
               if(k>1) {
-                  for(ii in (k-1):1) T[[ii]] <- tcrossprod(WQ %*% Z[[ii]],Z[[ii]])
+                  for(ii in (k-1):1) T[[ii]] <- tcrossprod(WQK %*% Z[[ii]],Z[[ii]])
               }
           } else {
-              for(ii in 1:k) T[[ii]] <- tcrossprod(WQ %*% Z[[ii]],Z[[ii]])
+              for(ii in 1:k) T[[ii]] <- tcrossprod(WQK %*% Z[[ii]],Z[[ii]])
           }
 
           ##if(k>=6) {
@@ -334,9 +373,9 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
           ##}
       }
 
-      x <- sapply(T,function(x) as.numeric(t(y) %*% x %*% WQ %*% y - sum(diag(x))))
-      x <- x * var.components
 
+      x <- sapply(T,function(x) as.numeric(t(y) %*% x %*% WQX %*% y - sum(diag(x))))
+      x <- x * var.components
 
       ## See nested for loops commented out below - evaluating the Expected Fisher Information, A
       ff <- function(x) sum(T[[x[1]]] * t(T[[x[2]]])) * var.components[x[1]] * var.components[x[2]]
@@ -369,7 +408,7 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       ##}
       ##}
 
-      stats <- c(stats, rllik1, rllik2, sigma[1:k], x[1:k])
+      stats <- c(stats, llik, sigma[1:k], x[1:k])
       if(verbose==-1) {
           ##cat(c(rllik1, rllik2, sigma[1:k], x[1:k]),"\n")
       }
@@ -382,17 +421,26 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
               if(verbose) {
                   cat("Warning: Non identifiable dispersion model\n")
                   ##print(round(A,6))
-                  sigmaTemp <- sigma
-                  ind <- which(pos)
-                  if(length(ind)) sigmaTemp[ind] <- exp(sigmaTemp[ind])
-                  cat(sigmaTemp)
+                  cat(sigma)
                   cat("\n")
               }
           }
       }
 
+      ## end of newton-raphson step
+      ## x is  -l'(sigma)/l''(sigma)
+      ## hence we add instead of subtract
+      ## taper controls the proportion of each step to take
+      ## for some reason 0.5 works very well
+
+      ##if(all(pos==1)) x <- sign(x) * pmin(abs(x),5) ## limit maximum shift we can take in one step to 5 units on log scale
+      coef <- coef + taper[cycle] * x
+      sigma[!pos] <- coef[!pos]
+      sigma[pos] <- exp(coef[pos])
+
       ## check the change in llik is small
-      if(abs(delta) < tol) break
+      if(cycle > 1 & abs(delta.llik) < tol*10) break
+      if(max(abs(x)) < tol) break
   }
 
   if(cycle==maxcyc)
@@ -400,11 +448,13 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
       ## issue a warning
       if(verbose) cat("WARNING:  maximum number of cycles reached before convergence\n")
   }
-  y
 
-  llik <- as.numeric(stats)
-  llik <- t(matrix(llik, 2*k+2, length(llik)/(2*k+2)))
+  stats <- as.numeric(stats)
+  stats <- matrix(stats, cycle, 2*k+1, byrow=TRUE)
+  colnames(stats) <- c("llik",paste("s^2_", Vcoef.names, sep=""), paste("der_", Vcoef.names, sep=""))
 
+  WX <- W %*% X
+  XtWX <- crossprod(X,WX)
   cov <- XtWX
   cov <- solve(cov, cbind(t(WX),diag(1,dim(XtWX)[1])))
   beta.cov <- matrix(cov[,(dim(t(WX))[2]+1):dim(cov)[2]],dim(X)[2],dim(X)[2])
@@ -426,17 +476,12 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   predicted <- NULL
   if(identity) {
       gam <- sigma[k]  ## coefficient of identity, last variance term
-      if(pos[k]) gam <- exp(gam)
       if(SWsolveINDICATOR) {
           ## Sigma is undefined
           Sigma <- 0
           for(i in 1:k)
           {
-              if(pos[i]) {
-                  Sigma <- Sigma + V[[i]]*exp(sigma[i])
-              } else {
-                  Sigma <- Sigma + V[[i]]*sigma[i]
-              }
+              Sigma <- Sigma + V[[i]] * sigma[i]
           }
       }
       predicted <- fitted.values + (Sigma - gam*In) %*% W%*%(y - fitted.values)
@@ -449,9 +494,6 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   ## Convert the estimates for the variance parameters, their standard
   ## errors etc to the usual scale
 
-  ind <- which(pos)
-  if(length(ind)) sigma[ind] <- exp(sigma[ind])
-
   FI <- A/2
 
   ## convert FI using pos
@@ -462,283 +504,15 @@ regress <- function(formula, Vformula, identity=TRUE, start=NULL, fraction=1, po
   ##    FI.c[i,j] <- FI[i,j]/(((sigma[i]-1)*pos[i]+1)*((sigma[j]-1)*pos[j]+1))
 
   sigma.cov <- ginv(FI.c)
+  names(sigma) <- Vcoef.names
+  rownames(sigma.cov) <- colnames(sigma.cov) <- Vcoef.names
 
-
-  result <- list(trace=llik, llik=llik[cycle, 1], cycle=cycle,
+  result <- list(trace=stats, llik=llik, cycle=cycle,
                  rdf=rankQ, beta=beta, beta.cov=beta.cov, beta.se=beta.se,
                  sigma=sigma[1:k], sigma.cov=sigma.cov[1:k,1:k], W=W, Q=Q,
                  fitted=fitted.values, predicted=predicted, pos=pos,
-                 Vnames=Vcoef.names, formula=formula, Vformula=Vformula, model=model)
+                 Vnames=Vcoef.names, formula=formula, Vformula=Vformula, Kcolnames=Kcolnames, model=model,Z=Z)
   class(result) <- "regress"
   result
 }
 
-## generalised inverse
-
-ginv <- function (X, tol = sqrt(.Machine$double.eps))
-{
-  ## taken from library MASS
-  if (length(dim(X)) > 2 || !(is.numeric(X) || is.complex(X)))
-    stop("X must be a numeric or complex matrix")
-  if (!is.matrix(X))
-    X <- as.matrix(X)
-  Xsvd <- svd(X)
-  if (is.complex(X))
-    Xsvd$u <- Conj(Xsvd$u)
-  Positive <- Xsvd$d > max(tol * Xsvd$d[1], 0)
-  if (all(Positive))
-    Xsvd$v %*% (1/Xsvd$d * t(Xsvd$u))
-  else if (!any(Positive))
-    array(0, dim(X)[2:1])
-  else Xsvd$v[, Positive, drop = FALSE] %*% ((1/Xsvd$d[Positive]) *
-                            t(Xsvd$u[, Positive, drop = FALSE]))
-}
-
-summary.regress <- function(object, ...) object
-
-print.regress <- function(x, digits=3, fixed.effects=T, ...)
-  {
-    cat("\nMaximised Residual Log Likelihood is",round(x$llik,digits),"\n",sep=" ")
-    indent.lin <- max(nchar(dimnames(x$beta)[[1]]))
-    indent.var <- max(nchar(x$Vnames))
-    indent <- max(indent.lin,indent.var)
-
-    extra.space <- ""
-    space.var <- extra.space
-    for(i in 0:(indent-indent.var)) space.var <- paste(space.var," ",sep="")
-    space.lin <- extra.space
-    for(i in 0:(indent-indent.lin)) space.lin <- paste(space.lin," ",sep="")
-
-    coefficients <- cbind(x$beta,x$beta.se)
-    dimnames(coefficients)[[2]] <- c("Estimate","Std. Error")
-    coefficients <- round(coefficients,digits)
-    if(fixed.effects) {
-      cat("\nLinear Coefficients:\n")
-      row.names(coefficients) <- paste(space.lin,dimnames(x$beta)[[1]],sep="")
-      print(coefficients)
-      cat("\n")
-    } else {
-      cat("\nLinear Coefficients: not shown\n\n")
-    }
-
-    ## New version of regress automatically converts to the linear
-    ## scale - as if pos was a vector of zeroes
-
-    var.coefficients <- cbind(x$sigma,sqrt(diag(as.matrix(x$sigma.cov))))
-    row.names(var.coefficients) <- paste(space.var,x$Vnames,sep="")
-    dimnames(var.coefficients)[[2]] <- c("Estimate","Std. Error")
-    var.coefficients <- round(var.coefficients,digits)
-    cat("Variance Coefficients:\n")
-    print(var.coefficients)
-    cat("\n")
-  }
-
-## when two matrices are passed to regress this is also called
-## to evaluate the REML at certain values of gamma and find a
-## good place to start the regress algorithm
-
-reml <- function(lambda, y, X, V0, V1,verbose=0){
-
-  if(is.null(dim(y)))
-    {
-      isNA <- is.na(y)
-      y <- y[isNA==F]
-    } else {
-      isNA <- apply(y,1,is.na)
-
-      if(is.matrix(isNA))  {
-        isNA <- as.logical(apply(isNA,2,sum))
-      }
-      y <- y[isNA==F,]
-    }
-  V0 <- V0[isNA==F,isNA==F]
-  V1 <- V1[isNA==F,isNA==F]
-  X <- X[isNA==F,]
-  X <- as.matrix(X)
-
-  qr <- qr(X)
-  ##print(qr$rank)
-  n <- dim(as.matrix(y))[1]
-  In <- diag(1,n)
-
-  X <- matrix(X[, qr$pivot[1:qr$rank]],n,qr$rank)
-  llik <- rep(0, length(lambda))
-  if(is.null(dim(y))) q <- 1 else q <- dim(y)[2]
-
-  n <- dim(X)[1]
-  if(missing(V0)) V0 <- diag(rep(1, n), n, n)
-  rank <- n - qr$rank
-  ##if(verbose==1) cat("n-p =",n,"-",qr$rank,"=",rank,"\n")
-  for(i in 1:length(lambda))
-    {
-      if(verbose>=2) cat(lambda[i],"\n")
-
-      Sigma <- (1-lambda[i])*V0 + lambda[i] * V1
-       cholesky <- try(chol(Sigma, pivot=FALSE), silent=TRUE)
-      if(class(cholesky) == "try-error" || min(diag(cholesky)) < 1e-9) return(1e+32)
-      W <- chol2inv(cholesky)
-      WX <- W %*% X
-      ##WX <- solve(Sigma,cbind(X,In))
-      ##W <- WX[,(dim(X)[2]+1):dim(WX)[2]]
-      ##WX <- WX[,1:dim(X)[2]]
-      XtWX <- t(X)%*%WX
-      WQ <- W - WX%*%solve(XtWX,t(WX))
-      rss <- t(y) %*% WQ %*% y
-      logdetrss <- sum(log(eigen(rss)$values[1:q]))
-      eVals <- eigen(WQ,symmetric=TRUE,only.values=TRUE)$values[1:rank]
-      ldet <- sum(log(eVals))
-      llik[i] <- Re(ldet*q/2 - rank*logdetrss/2)
-    }
-  imax <- sort.list(-llik)[1]
-  lambdamax <- lambda[imax]
-  curv <- 0
-  if(imax > 1 && imax < length(lambda)){
-    delta <- (lambda[imax+1] - lambda[imax-1])/2
-    slope <-  (llik[imax+1] - llik[imax-1])/2
-    curv <- llik[imax-1] -2*llik[imax] + llik[imax+1]
-    lambdamax <- lambdamax - slope/curv * delta
-    curv <- -curv/delta^2
-  }
-  lamMax <- lambdamax
-  Sigma <- (1-lamMax)*V0 + lamMax * V1
-  cholesky <- try(chol(Sigma, pivot=FALSE), silent=TRUE)
-  if(class(cholesky) == "try-error" || min(diag(cholesky)) < 1e-9) return(1e+32)
-  W <- chol2inv(cholesky)
-  WX <- W %*% X
-  ##WX <- solve(Sigma,cbind(X,In))
-  ##W <- WX[,(dim(X)[2]+1):dim(WX)[2]]
-  ##WX <- WX[,1:dim(X)[2]]
-  XtWX <- t(X)%*%WX
-  FItWX <- solve(XtWX,t(WX))
-  WQ <- W - WX%*%FItWX
-  rss <- t(y) %*% WQ %*% y
-  beta <- FItWX %*% y
-
-  list(llik=as.numeric(llik),rms=rss/rank, beta=beta, gamma=lambda, gamMax=lambdamax,W=W)
-}
-
-remlOptimize <- function(y, X, V0, V1,verbose=0,...){
-
-  if(is.null(dim(y)))
-    {
-      isNA <- is.na(y)
-      y <- y[isNA==F]
-    } else {
-      isNA <- apply(y,1,is.na)
-
-      if(is.matrix(isNA))  {
-        isNA <- as.logical(apply(isNA,2,sum))
-      }
-      y <- y[isNA==F,]
-    }
-  V0 <- V0[isNA==F,isNA==F]
-  V1 <- V1[isNA==F,isNA==F]
-  X <- X[isNA==F,]
-  X <- as.matrix(X)
-
-  qr <- qr(X)
-  ##print(qr$rank)
-  n <- dim(as.matrix(y))[1]
-  In <- diag(1,n)
-
-  X <- matrix(X[, qr$pivot[1:qr$rank]],n,qr$rank)
-  if(is.null(dim(y))) q <- 1 else q <- dim(y)[2]
-
-  n <- dim(X)[1]
-  if(missing(V0)) V0 <- diag(rep(1, n), n, n)
-  rank <- n - qr$rank
-  ##if(verbose==1) cat("n-p =",n,"-",qr$rank,"=",rank,"\n")
-
-  f <- function(lambda,verbose=verbose) {
-    if(verbose>=2) cat(lambda,"\n")
-    Sigma <- (1-lambda)*V0 + lambda * V1
-    cholesky <- try(chol(Sigma, pivot=FALSE), silent=TRUE)
-    if(class(cholesky) == "try-error" || min(diag(cholesky)) < 1e-9) return(1e+32)
-    W <- chol2inv(cholesky)
-    WX <- W %*% X
-    ##WX <- solve(Sigma,cbind(X,In))
-    ##W <- WX[,(dim(X)[2]+1):dim(WX)[2]]
-    ##WX <- WX[,1:dim(X)[2]]
-    XtWX <- t(X)%*%WX
-    WQ <- W - WX%*%solve(XtWX,t(WX))
-    rss <- t(y) %*% WQ %*% y
-    logdetrss <- sum(log(eigen(rss)$values[1:q]))
-    eVals <- eigen(WQ,symmetric=TRUE,only.values=TRUE)$values[1:rank]
-    ldet <- sum(log(eVals))
-    llik <- Re(ldet*q/2 - rank*logdetrss/2)
-    llik
-  }
-
-  res <- optimize(f,interval=c(0,1),maximum=TRUE,verbose=verbose,...)
-  lamMax <- res$maximum
-  llikMax <- res$objective
-
-  Sigma <- (1-lamMax)*V0 + lamMax * V1
-  cholesky <- try(chol(Sigma, pivot=FALSE), silent=TRUE)
-  if(class(cholesky) == "try-error" || min(diag(cholesky)) < 1e-9) return(1e+32)
-  W <- chol2inv(cholesky)
-  WX <- W %*% X
-  ##WX <- solve(Sigma,cbind(X,In))
-  ##W <- WX[,(dim(X)[2]+1):dim(WX)[2]]
-  ##WX <- WX[,1:dim(X)[2]]
-  XtWX <- t(X)%*%WX
-  FItWX <- solve(XtWX,t(WX))
-  WQ <- W - WX%*%FItWX
-  rss <- t(y) %*% WQ %*% y
-  beta <- FItWX %*% y
-
-  list(llik=as.numeric(llikMax),rms=rss/rank, beta=beta, gamMax=lamMax,W=W)
-}
-
-SWsolve <- function(S,K,D,Dinv=NULL,b) {
-    ## solve(a,b) where a has the form SKS' + D using the Sherman Woodley identities
-
-    if(is.matrix(K) & is.matrix(D) & !is.null(Dinv)) {
-        ## Case 1 - all are matrices
-        tSDi <- crossprod(S,Dinv)
-        Kinv <- solve(K)
-        ret <- solve(Kinv + tSDi %*% S, tSDi)
-        ret <- Dinv - crossprod(tSDi,ret)
-        if(!missing(b)) ret <- ret %*% b
-        return(ret)
-    }
-
-    if(is.numeric(K) & !is.null(Dinv)) {
-        tSDi <- crossprod(S,Dinv)
-        ret <- solve(1/K * diag(ncol(S)) + tSDi %*% S, tSDi)
-        ret <- Dinv - crossprod(tSDi,ret)
-        if(!missing(b)) ret <- ret %*% b
-        return(ret)
-    }
-
-    if(is.numeric(D) & is.matrix(K)) {
-        ret <- 1/D * diag(nrow(S)) - 1/D^2 * S %*% solve(solve(K) + 1/D * crossprod(S),t(S))
-        if(!missing(b)) ret <- ret %*% b
-        return(ret)
-    }
-
-    if(is.numeric(K) & is.numeric(D)) {
-        ret <- 1/D * diag(nrow(S)) - 1/D^2 * S %*% solve(1/K * diag(ncol(S)) + 1/D * crossprod(S),t(S))
-        if(!missing(b)) ret <- ret %*% b
-        return(ret)
-    }
-}
-
-
-SWsolve2 <- function(Zlist,clist,b) {
-    if(length(Zlist)!=(length(clist)-1)) stop()
-    k <- length(Zlist)
-    D <- clist[1] * tcrossprod(Zlist[[1]])
-    diag(D) <- diag(D) + clist[k+1]
-    Dinv <- SWsolve(Zlist[[1]],clist[1],clist[k+1])
-    if(k==1) {
-        if(!missing(b)) Dinv <- Dinv %*% b
-        return(Dinv)
-    }
-    for(ii in 2:k) {
-        Dinv <- SWsolve(Zlist[[ii]],clist[ii],D,Dinv)
-        D <- D + clist[ii]*tcrossprod(Zlist[[ii]])
-    }
-    if(!missing(b)) Dinv <- Dinv %*% b
-    return(Dinv)
-}

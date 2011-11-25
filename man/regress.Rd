@@ -1,5 +1,8 @@
 \name{regress}
 \alias{regress}
+\alias{print.regress}
+\alias{summary.regress}
+\alias{BLUP}
 
 \title{Fit a Gaussian Linear Model with Linear Covariance Structure}
 
@@ -11,10 +14,15 @@
   Uses a Newton-Raphson algorithm to maximise the residual log
   likelihood.}
 
-\synopsis{regress(formula, Vformula, identity=TRUE, start=NULL, fraction=1, pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
+\synopsis{regress(formula, Vformula, identity=TRUE, kernel=NULL,
+                    start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
+                    maxcyc=50, tol=1e-4, data,
+                    fraction=NULL,print.level=NULL)}
 
-\usage{regress(formula, Vformula, identity=TRUE, start=NULL, fraction=1,
-pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
+\usage{regress(formula, Vformula, identity=TRUE, kernel=NULL,
+                    start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
+                    maxcyc=50, tol=1e-4, data,
+                    fraction=NULL,print.level=NULL)}
 
 \arguments{
   \item{formula}{ a symbolic description of the model to be fitted. The
@@ -25,11 +33,16 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
     corresponding block factor.}
   \item{identity}{Logical variable, includes the identity as the
     final matrix of the covariance structure.  Default is TRUE}
+  \item{kernel}{Compute the log likelihood based on a reduced
+  observation TY where T has this kernel. Default value of NULL assumes
+  that the kernal matches the fixed effects model matrix X corresponding
+  to REML. Setting kernel=0 gives the ordinary likelihood and kernel=1
+  gives the one dimensional subspace of constant vectors.}
   \item{start}{Specify the variance components at which the
     Newton-Raphson algorithm starts.  Default value is
     \code{rep(var(y),k)}.}
-  \item{fraction}{The proportion of each step to take.  Default value is
-    1. Useful to prevent taking huge steps in the first few iterations.}
+  \item{taper}{The proportion of each step to take.  A vector of values
+  from 0 to 1 of length maxcyc. Default value takes smaller steps initially. }
   \item{pos}{logical vector of length k, where k is the number of
     matrices in the covariance structure.  Indicates which variance
     components are positive (TRUE) and which are real (FALSE).
@@ -54,6 +67,7 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
   \item{data}{an optional data frame containing the variables in the model.
     By default the variables are taken from 'environment(formula)',
     typically the environment from which 'regress' is called.}
+  \item{fraction}{Deprecated, see taper}
   \item{print.level}{Deprecated}
 }
 
@@ -112,8 +126,11 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
   \item{formula}{Copy of formula}
   \item{Vformula}{Updated version of Vformula to include identity if
     necessary}
+  \item{Kcolnames}{Names associated with the kernel}
   \item{model}{Response, covariates and matrices/factors to be used for
     model fitting}
+  \item{Z}{Design matrices associated with the random effects, used for
+  computation of BLUPs}
 }
 
 \references{
@@ -140,6 +157,16 @@ pos, verbose=0, gamVals=NULL, maxcyc=50, tol=1e-4, data, print.level)}
   oats.lme <- lme(Y~N+V,random=~1|B/V,data=Oats,method="REML")
   summary(oats.lme)
 
+  ## print and summary
+  oats.reg
+  print(oats.reg)
+  summary(oats.reg)
+
+  ## BLUPs
+  bb <- BLUP(oats.reg,"B")
+  bb$Mean
+  bb$Variance
+  bb$Covariance
 }
 
 \keyword{regression}
