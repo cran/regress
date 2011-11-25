@@ -146,31 +146,22 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   pos <- pos[1:k]
 
   ## Sherman Woodley identities for matrix inverses can be brought to bear here
-  SWsolveINDICATOR <- FALSE
-  if(all(sapply(V,is.factor))) {
+  if (any(!sapply(V, is.factor))) {  # Contribution by Hans Jurgen Auinger
       SWsolveINDICATOR <- TRUE
-      Z <- list() ## see use below -
-      for(i in 1:length(V))
-      {
-          if(is.factor(V[[i]])){
-              Vi <- model.matrix(~V[[i]]-1)
-              colnames(Vi) <- levels(V[[i]])
-              Z[[i]] <- Vi ## list of model matrices
-              V[[i]] <- tcrossprod(Vi)
-          }
+  } else SWsolveINDICATOR <- FALSE
+  Z <- list()
+  for (i in 1:length(V)) {
+      if (is.factor(V[[i]])) {
+          Vi <- model.matrix(~V[[i]] - 1)
+          colnames(Vi) <- levels(V[[i]])
+          Z[[i]] <- Vi
+          V[[i]] <- tcrossprod(Vi)
+      } else{
+          Z[[i]] <- V[[i]]
       }
-      names(Z) <- names(V)
-  } else {
-      for(i in 1:length(V))
-      {
-          if(is.factor(V[[i]])){
-              Vi <- model.matrix(~V[[i]]-1)
-              Vi <- tcrossprod(Vi)
-              V[[i]] <- Vi
-          }
-      }
-      Z <- V ## So it is always defined
   }
+  names(Z) <- names(V)
+
   ## So V is always a list of variance coavriance matrices, Z contains
   ## the model matrices of factors when we need to invoke the Sherman
   ## Woodley identities
