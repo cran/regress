@@ -1,12 +1,12 @@
-61446c61b40afec1a9745a6264d7db54 *DESCRIPTION
+ed2b5b3fbd9c9b1ebac9650dfd37f6ec *DESCRIPTION
 ae819f1c3869e92dda30ed2006065778 *NAMESPACE
 eff6c807fac9004c9b075441bbf1ab61 *R/BLUP.R
 0cfcc1b3eb73a330b648df3389a48fa2 *R/MatrixInversions.R
 fb02080dbc80bda3545cf2a075c0c66c *R/ginv.R
 b5301ab4575b1e85bafb8968fb88ded4 *R/printSummary.R
-afb08d2ac20c1bcd92bcb6b1772354fd *R/regress.R
+438783415a1001dbf53703138e063862 *R/regress.R
 259f4035724ff8d00417fd290bdc87d1 *R/reml.R
 a3af71fb4b5cab1754ff388aee7cedff *inst/CITATION
-1477b616e0c2df19aed9c66ee90532c7 *man/regress.Rd
+bf3e92879264eb1810404c0f0c63bcfa *man/regress.Rd
 e385c9d40393bd0e0d82417697f5451e *tests/BLUP.tests.R
 497d160acca043231f438169de001a77 *tests/regress.tests.R

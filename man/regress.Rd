@@ -12,7 +12,10 @@
   nugget effect.  Fits model by maximising the residual log likelihood,
   also known as the REML log likelihood or restricted log likelihood.
   Uses a Newton-Raphson algorithm to maximise the residual log
-  likelihood.}
+  likelihood. Some computational efficiencies are achieve when all
+  variance components are associated with factors. In such a random
+  effects model the matrix iversion is computed using the Sherman Morrison
+  Woodbury identities.}
 
 \synopsis{regress(formula, Vformula, identity=TRUE, kernel=NULL,
                     start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
@@ -71,7 +74,8 @@
   \item{print.level}{Deprecated}
 }
 
-\details{As the code is running it outputs the variance components, and
+\details{
+  As the code is running it outputs the variance components, and
   the residual log likelihood at each iteration.
 
   To avoid confusion over terminology.  I define variance components to
@@ -93,6 +97,31 @@
   some ambiguity.  Are we predicting conditional on the observed data.
   Are we predicting observations from the fitted model itself?  It is
   all normal anyway so it is straightforward, see our paper on regress.
+
+  When you fit a Gaussian regression model using fit <- regress(y~X, ~V,
+  kernel=K) the function computes the log likelihood based on the
+  reduced observation $TY ~ N(TX, T V T')$, where $T$ is a linear
+  transformation with kernel $K$.  Only $n-k$ degrees of freedom are
+  available.  Ordinary likelihood corresponds to $K=0$, and REML to
+  $K=X$, but these are not the only options.
+
+  When you fit two nested Gaussian models ($X0 subset of X1$ and $V0
+  subset of V1$) using the commands:
+
+  fit0 <- regress(y~X0, ~V0, kernel=K)
+
+  fit1 <- regress(y~X1, ~V1, kernel=K)
+
+  then the likelihood ratio statistic fit1$llik - fit0$llik is the
+  ordinary likelihood ratio based on the Gaussian observation $TY$ where
+  the kernel of T is K.  So if you set kernel=0, you get the ordinary
+  likelihood ratio based on the complete observation $y$; And if you set
+  kernel=1, you get the likelihood ratio based on simple contrasts $y_i
+  - y_j$ only.  So in the latter case, you have only $n-1$ degrees of
+  freedom to work with.  And if you set kernel=X0, you get the
+  likelihood ratio based on contrasts $Ty$ with kernel $X0$, which for
+  fit0 is the REML likelihood.
+
   }
 
 \value{
@@ -134,18 +163,33 @@
 }
 
 \references{
-  G. Tunnicliffe Wilson, "On the use of marginal likelihood in time
-  series model estimation."  JRSS B, Vol 51, No 1, 1989, 15-27.
-  D. Clifford and P. McCullagh, "The regress Library" R News.
+  G. Tunnicliffe Wilson (1989), "On the use of marginal likelihood in time
+  series model estimation."  \emph{JRSS B}, Vol 51, No 1, 15-27.
+
+  D. Clifford and P. McCullagh (2006), "The regress function" \emph{R News}
+  6(2):6-10
+
+  Weisstein, Eric W. "Woodbury Formula." From MathWorld--A Wolfram Web
+  Resource. http://mathworld.wolfram.com/WoodburyFormula.html
+
+  Weisstein, Eric W. "Sherman-Morrison Formula." From MathWorld--A
+  Wolfram Web Resource. http://mathworld.wolfram.com/Sherman-MorrisonFormula.html 
 }
 
-\author{David Clifford, Peter McCullagh.}
+\author{David Clifford, Peter McCullagh}
 
 \examples{
+
+  ######################
+  ## Comparison with lme
+  ######################
+
   ## Example of Random Effects model from Venables and Ripley, page 205
   library("nlme")
   library("regress")
-  data(Oats)
+
+  citation("regress")
+
   names(Oats) <- c("B","V","N","Y")
   Oats$N <- as.factor(Oats$N)
 
@@ -162,11 +206,89 @@
   print(oats.reg)
   summary(oats.reg)
 
-  ## BLUPs
-  bb <- BLUP(oats.reg,"B")
-  bb$Mean
-  bb$Variance
-  bb$Covariance
+  rm(oats.reg, oats.lme, Oats)
+
+  #######################
+  ## Computation of BLUPs
+  #######################
+
+  ex2 <- list()
+  ex2 <- within(ex2,{
+
+    ## Set up example
+    set.seed(1001)
+    n <- 101
+    x1 <- runif(n)
+    x2 <- seq(0,1,l=n)
+    z1 <- gl(4,10,n)
+    z2 <- gl(6,1,n)
+
+    X <- model.matrix(~1 + x1 + x2)
+    Z1 <- model.matrix(~z1-1)
+    Z2 <- model.matrix(~z2-1)
+
+    ## Create the individual random and fixed effects
+    beta <- c(1,2,3)
+    eta1 <- rnorm(ncol(Z1),0,10)
+    eta2 <- rnorm(ncol(Z2),0,10)
+    eps <- rnorm(n,0,3)
+
+    ## Combine them into a response
+    y <- X \%*\% beta + Z1 \%*\% eta1 + Z2 \%*\% eta2 + eps
+  })
+
+  ## Data frame containing all we need for model fitting
+  regressDF <- with(ex2,data.frame(y,x1,x2,z1,z2))
+  rm(ex2)
+
+  ## Fit the model using regress
+  regress.output <- regress(y~1 + x1 + x2,~z1 + z2,data=regressDF)
+
+  summary(regress.output)
+
+  blup1 <- BLUP(regress.output,RE="z1")
+  blup1$Mean
+  blup1$Variance
+  blup1$Covariance
+  cov2cor(blup1$Covariance) ## Large correlation terms
+
+  blup2 <- BLUP(regress.output) ## Joint BLUP of z1 and z2 by default
+  blup2$Mean
+  blup2$Variance
+  cov2cor(blup2$Covariance)  ## Strong negative correlation between BLUPs
+                             ## for z1 and z2
+
+  rm(blup1,blup2)
+
+  ############################
+  ## Examples of use of kernel
+  ############################
+
+  ## LRT for z2 using ordinary likelihood
+  with(regressDF,{
+       K <- 0
+       model1 <- regress(y~1+x1,~z1,kernel=K)
+       model2 <- regress(y~1+x1+x2,~z1,kernel=K)
+       2*(model2$llik - model1$llik)
+  })
+
+  ## REML LRT for z2
+  with(regressDF,{
+       K <- model.matrix(~1+x1+x2)
+       model1 <- regress(y~1+x1,~z1,kernel=K)
+       model2 <- regress(y~1+x1+x2,~z1,kernel=K)
+       2*(model2$llik - model1$llik)
+  })
+
+  ## LRT for x2 based on a reduced observation TY with kernel K
+  with(regressDF,{
+       K <- model.matrix(~1+x1)
+       model1 <- regress(y~1+x1,~z1,kernel=K)
+       model2 <- regress(y~1+x1+x2,~z1,kernel=K)
+       2*(model2$llik - model1$llik)
+  })
+
+  rm(regressDF, regress.output)
 }
 
 \keyword{regression}

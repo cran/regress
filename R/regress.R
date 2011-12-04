@@ -17,13 +17,13 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       cat("\nWarning: fraction has been deprecated and replaced by taper - a vector of values from 0 to 1 giving a unique fraction for each step of the Newton Raphson algorithm.\n")
   }
 
+  if(verbose>9) cat("Extracting objects from call\n")
   if(missing(data)) data <- environment(formula)
   mf <- model.frame(formula,data=data,na.action=na.pass)
   mf <- eval(mf,parent.frame())
   y <- model.response(mf)
 
   X <- model.matrix(formula,data=data)
-
   model <- list()
   ##model$formula <- formula
   ##model$Vformula <- Vformula
@@ -54,7 +54,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       Xcolnames <- paste("X.column",c(1:dim(as.matrix(X))[2]),sep="")
   }
 
-  X <- X[isNA==F,]
+  X <- X[isNA==FALSE,]
   X <- matrix(X, n, length(X)/n)
   qr <- qr(X)
   rankQ <- n-qr$rank
@@ -64,6 +64,8 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   } else {
       cat("\nERROR: X has rank 0\n\n")
   }
+
+  if(verbose>9) cat("Setting up kernel\n")
 
   if(missing(kernel)){
       K <- X
@@ -104,6 +106,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   if(missing(tol)) tol <- 1e-4
   delta <- 1
 
+  if(verbose>9) cat("Removing parts of random effects corresponding to missing values\n")
   ## remove missing values
   for(i in 1:k)
   {
@@ -145,7 +148,8 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   pos <- c(pos,rep(FALSE,k))
   pos <- pos[1:k]
 
-  ## Sherman Woodley identities for matrix inverses can be brought to bear here
+  ## Sherman Morrison Woodbury identities for matrix inverses can be brought to bear here
+  if(verbose>9) cat("Checking if we can apply the Sherman Morrison Woodbury identites for matrix inversion\n")
   if (any(!sapply(V, is.factor))) {  # Contribution by Hans Jurgen Auinger
       SWsolveINDICATOR <- TRUE
   } else SWsolveINDICATOR <- FALSE
@@ -164,7 +168,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
 
   ## So V is always a list of variance coavriance matrices, Z contains
   ## the model matrices of factors when we need to invoke the Sherman
-  ## Woodley identities
+  ## Woodbury identities
 
   ## Expected Fisher Information
   A <- matrix(rep(0, k^2), k, k)
