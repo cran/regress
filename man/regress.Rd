@@ -173,7 +173,7 @@
   Resource. http://mathworld.wolfram.com/WoodburyFormula.html
 
   Weisstein, Eric W. "Sherman-Morrison Formula." From MathWorld--A
-  Wolfram Web Resource. http://mathworld.wolfram.com/Sherman-MorrisonFormula.html 
+  Wolfram Web Resource. http://mathworld.wolfram.com/Sherman-MorrisonFormula.html
 }
 
 \author{David Clifford, Peter McCullagh}
@@ -205,6 +205,9 @@
   oats.reg
   print(oats.reg)
   summary(oats.reg)
+
+  ranef(oats.lme)
+  BLUP(oats.reg)
 
   rm(oats.reg, oats.lme, Oats)
 

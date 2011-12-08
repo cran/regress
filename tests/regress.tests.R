@@ -7,8 +7,19 @@ data(Oats)
 names(Oats) <- c("B","V","N","Y")
 Oats$N <- as.factor(Oats$N)
 
+## Using regress
 oats.reg <- regress(Y~N+V,~B+I(B:V),identity=TRUE,verbose=1,data=Oats)
 summary(oats.reg)
+
+## Using lme
+oats.lme <- lme(Y~N+V,random=~1|B/V,data=Oats,method="REML")
+summary(oats.lme)
+
+if((oats.lme$sigma^2 - oats.reg$sigma[3])^2>0.0001) stop("Error 1 - doesn't match lme")
+
+b1 <- ranef(oats.lme)
+b2 <- BLUP(oats.reg)
+if(sum((unlist(b1) - b2$Mean)^2)>0.0002) stop("Error with BLUP")
 
 ## Test 2, Multivariate Model
 

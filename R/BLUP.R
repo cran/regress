@@ -14,7 +14,7 @@ BLUP <- function(model,RE=NULL) {
     if(class(model)!="regress") stop("model should be of class regress")
 
     ## conditional expected values - all of them
-    Wy <- model$W %*% model$model[[1]]
+    Wy <- model$W %*% (model$model[[1]] - model$fitted)
     Us <- list()
     for(ii in 1:length(model$Z)) {
         Us[[ii]] <- as.vector(model$sigma[ii] * t(model$Z[[ii]]) %*% Wy)

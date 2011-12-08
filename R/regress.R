@@ -150,7 +150,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
 
   ## Sherman Morrison Woodbury identities for matrix inverses can be brought to bear here
   if(verbose>9) cat("Checking if we can apply the Sherman Morrison Woodbury identites for matrix inversion\n")
-  if (any(!sapply(V, is.factor))) {  # Contribution by Hans Jurgen Auinger
+  if (all(sapply(V, is.factor))) {  # Contribution by Hans Jurgen Auinger
       SWsolveINDICATOR <- TRUE
   } else SWsolveINDICATOR <- FALSE
   Z <- list()
@@ -279,10 +279,12 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
 
       if(verbose>=1) {
           cat(cycle, " ")
-          ## cat(sigma)
+          ##cat(sigma)
       }
 
       ##Sigma <- matrix(0,dim(V[[1]])[1],dim(V[[1]])[2])
+      ## if(verbose>9) cat("Sherman Morrison Woodbury",SWsolveINDICATOR,"\n")
+
       if(!SWsolveINDICATOR) {
           Sigma <- 0
           ## can we get rid of this loop?
@@ -303,6 +305,9 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       }
 
       rss <- as.numeric(t(y) %*% WQX %*% y)
+
+      ##if(verbose>9) cat("Sigma[1:5]",Sigma[1:5],"\n")
+      ##if(verbose>9) cat("RSS",rss,"WQX[1:5]",WQX[1:5],"\n")
       sigma <- sigma * rss/rankQK
       coef[!pos] <- sigma[!pos]
       coef[pos] <- log(sigma[pos])
