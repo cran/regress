@@ -148,7 +148,12 @@
   associated with the identity and that assosicated with the rest of the
   variance structure, this second part is the predicted values.  If
   $Sigma = V1 + V2$ at point of convergence then y = V1 W y + V2 W y is
-  the decomposition.}
+  the decomposition. This is the conditional expectation for new observations conditional on the
+  observed data.}
+  \item{predictedVariance}{Variance of new observations conditional on
+    the observed data}
+  \item{predictedVariance2}{Additional variance associated with the
+  uncertainty of beta. Can be be added to predictedVariance}
   \item{pos}{Indicator for the scale for each variance parameter.}
   \item{Vnames}{Names associated with each variance component, used in
     \code{print.regress}.}

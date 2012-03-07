@@ -23,7 +23,6 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   mf <- eval(mf,parent.frame())
   y <- model.response(mf)
 
-  X <- model.matrix(formula,data=data)
   model <- list()
   ##model$formula <- formula
   ##model$Vformula <- Vformula
@@ -31,10 +30,21 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
 
   if(missing(Vformula)) Vformula <- NULL
 
+  ## Find missing values in fixed part of the model :: Change Aui Mar 1 2012
+  isNA <-  apply(is.na(mf), 1, any)
+
   if(!is.null(Vformula))
   {
       V <- model.frame(Vformula,data=data,na.action=na.pass)
       V <- eval(V, parent.frame())
+      # find missings in random part of the model Aui Mar 1 2012
+      mfr <- is.na(V)
+      if(ncol(mfr) == 1){
+        isNA <- isNA | mfr
+      } else {
+        isNA <- isNA | apply(mfr[,!apply(mfr,2,all)], 1, any) # use only columns of the matrix with some nonmissing values
+      }
+      rm(mfr)
       Vcoef.names <- names(V)
       V <- as.list(V)
       k <- length(V)
@@ -44,17 +54,15 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       Vcoef.names=NULL
   }
 
-  ## Remove missing values
-  isNA <- is.na(y)
-  ##y <- y[isNA==F]
-  y <- na.omit(y)
+  X <- model.matrix(formula, mf[!isNA,]) # Aui Mar 1 2012 account for missings in the random part
+
+  y <- y[!isNA]
   n <- length(y)
   Xcolnames <- dimnames(X)[[2]]
   if(is.null(Xcolnames)) {
       Xcolnames <- paste("X.column",c(1:dim(as.matrix(X))[2]),sep="")
   }
 
-  X <- X[isNA==FALSE,]
   X <- matrix(X, n, length(X)/n)
   qr <- qr(X)
   rankQ <- n-qr$rank
@@ -71,7 +79,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       K <- X
       colnames(K) <- Xcolnames
       reml <- TRUE
-      kernel<-NULL
+      kernel <- NULL
   } else {
       if(length(kernel)==1 && kernel>0){
           K <- matrix(rep(1, n), n, 1)
@@ -83,8 +91,23 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
           rankQK <- n
       }
       if(length(kernel) > 1) {
-          ##K is a matrix I hope
-          K <- kernel[isNA==F,]
+          ##K is a matrix I hope :: Change Aui Mar 1 2012
+          if(is.matrix(kernel)) {
+              K <- kernel[!isNA,]
+          } else {
+              K <- model.frame(kernel, data=data, na.action=na.pass)
+              K <- eval(K, parent.frame())
+              if(ncol(K) == 1){
+                dimNamesK <- dimnames(K)
+                K <- K[!isNA, ]
+                dimNamesK[[1]] <- dimNamesK[[1]][!isNA]
+                K <- data.frame(V1 = K)
+                dimnames(K) <- dimNamesK
+              } else {
+                K <- K[!isNA, ]
+              }
+              K <- model.matrix(kernel, K)
+          }
       }
       reml <- FALSE
   }
@@ -96,9 +119,9 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       if(qr$rank == 0) K <- NULL else {
           K <- matrix(K[, qr$pivot[1:qr$rank]],n,qr$rank)
           Kcolnames <- Kcolnames[qr$pivot[1:qr$rank]]
-          KX <- cbind(K, X)	# Spanning K + X: Oct 12 2011
+          KX <- cbind(K, X) # Spanning K + X: Oct 12 2011
           qr <- qr(KX)
-          KX <- matrix(KX[, qr$pivot[1:qr$rank]],n,qr$rank)	# basis of K+X
+          KX <- matrix(KX[, qr$pivot[1:qr$rank]],n,qr$rank) # basis of K+X
       }
   }
 
@@ -112,12 +135,11 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   {
       if(is.matrix(V[[i]]))
       {
-          V[[i]] <- V[[i]][isNA==F,]
-          V[[i]] <- V[[i]][,isNA==F]
+          V[[i]] <- V[[i]][!isNA, !isNA]
       }
       if(is.factor(V[[i]]))
       {
-          V[[i]] <- V[[i]][isNA==F]
+          V[[i]] <- V[[i]][!isNA]
       }
   }
 
@@ -133,6 +155,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       ##Vcoef.names <- c("Id",Vcoef.names)
       Vcoef.names <- c(Vcoef.names,"In")
       Vformula <- as.character(Vformula)
+      Vformula[1] <- "~"
       Vformula[2] <- paste(Vformula[2],"+In")
       Vformula <- as.formula(Vformula)
   }
@@ -150,7 +173,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
 
   ## Sherman Morrison Woodbury identities for matrix inverses can be brought to bear here
   if(verbose>9) cat("Checking if we can apply the Sherman Morrison Woodbury identites for matrix inversion\n")
-  if (all(sapply(V, is.factor))) {  # Contribution by Hans Jurgen Auinger
+  if (all(sapply(V, is.factor)) & k>2 ) {  # Contribution by Hans Jurgen Auinger
       SWsolveINDICATOR <- TRUE
   } else SWsolveINDICATOR <- FALSE
   Z <- list()
@@ -278,7 +301,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       }
 
       if(verbose>=1) {
-          cat(cycle, " ")
+          cat(cycle, "sigma =",sigma)
           ##cat(sigma)
       }
 
@@ -300,7 +323,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
           WQK <- W - WK %*% solve(t(K)%*%WK, t(WK))
       }
       if(reml) WQX <- WQK else {
-          WX <- W %*% KX		# including the kernel (Oct 12 2011)
+          WX <- W %*% KX        # including the kernel (Oct 12 2011)
           WQX <- W - WX %*% solve(t(KX)%*%WX, t(WX))
       }
 
@@ -326,9 +349,15 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       if(cycle == 1) llik0 <- llik
       delta.llik <- llik - llik0
       llik0 <- llik
-      if(verbose) cat("sigma =", sigma, "(scale-adjusted)\n")
-      if(verbose && reml) cat("resid llik =", llik, "delta.llik =", delta.llik, "\n")
-      if(verbose && !reml) cat("llik =", llik, "delta.llik =", delta.llik, "\n")
+
+      if(verbose && reml) cat(" resid llik =", llik,"\n")
+      if(verbose && !reml) cat(" llik =", llik, "\n")
+
+      if(verbose) cat(cycle, "adjusted sigma =",sigma)
+      if(cycle>1) {
+          if(verbose && reml) cat(" delta.llik =", delta.llik, "\n")
+          if(verbose && !reml) cat(" delta.llik =", delta.llik, "\n")
+      } else cat("\n")
 
       ## now the fun starts, derivative and expected fisher info
       ## the 0.5 multiple is ignored, it is in both and they cancel
@@ -443,6 +472,18 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       if(max(abs(x)) < tol) break
   }
 
+  ## Recompute Sigma at adjusted sigman values
+  if(!SWsolveINDICATOR) {
+      Sigma <- 0
+      ## can we get rid of this loop?
+      for(i in 1:k) Sigma <- Sigma + V[[i]]*sigma[i]
+
+      W <- solve(Sigma,In)
+  } else {
+      W <- SWsolve2(Z[1:(k-1)],sigma)
+  }
+
+
   if(cycle==maxcyc)
   {
       ## issue a warning
@@ -474,6 +515,8 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   Q <- In -  X %*% cov
 
   predicted <- NULL
+  predictedVariance <- NULL
+  predictedVariance2 <- NULL
   if(identity) {
       gam <- sigma[k]  ## coefficient of identity, last variance term
       if(SWsolveINDICATOR) {
@@ -485,6 +528,15 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
           }
       }
       predicted <- fitted.values + (Sigma - gam*In) %*% W%*%(y - fitted.values)
+      ## predictedVariance <- Sigma - (Sigma - gam*In) %*% W %*% (Sigma - gam*In)
+      ## really the last term should be transposed but they are square symmetric matrices here so....
+      ## If you multiply it out and take the diagonal only it simplifies to....
+      predictedVariance <- 2*gam - gam^2*diag(W)
+      ## Variance of a new observation conditional on data (assuming
+      ## known beta)
+      predictedVariance2 <- diag(gam^2 * WX %*% beta.cov %*% t(WX))
+      ## Additional variance of a new observation conditional on data taking into
+      ## account variation in beta
   }
 
   ## scale dictated by pos
@@ -507,12 +559,15 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   names(sigma) <- Vcoef.names
   rownames(sigma.cov) <- colnames(sigma.cov) <- Vcoef.names
 
-  result <- list(trace=stats, llik=llik, cycle=cycle,
-                 rdf=rankQ, beta=beta, beta.cov=beta.cov, beta.se=beta.se,
-                 sigma=sigma[1:k], sigma.cov=sigma.cov[1:k,1:k], W=W, Q=Q,
-                 fitted=fitted.values, predicted=predicted, pos=pos,
-                 Vnames=Vcoef.names, formula=formula, Vformula=Vformula, Kcolnames=Kcolnames, model=model,Z=Z)
+  result <- list(trace=stats, llik=llik, cycle=cycle, rdf=rankQ,
+                 beta=beta, beta.cov=beta.cov, beta.se=beta.se,
+                 sigma=sigma[1:k], sigma.cov=sigma.cov[1:k,1:k], W=W,
+                 Q=Q, fitted=fitted.values, predicted=predicted,
+                 predictedVariance=predictedVariance,
+                 predictedVariance2=predictedVariance2,pos=pos,
+                 Vnames=Vcoef.names, formula=formula,
+                 Vformula=Vformula, Kcolnames=Kcolnames,
+                 model=model,Z=Z, X=X, Sigma=Sigma)
   class(result) <- "regress"
-  result
+  return(result)
 }
-
