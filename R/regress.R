@@ -54,6 +54,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       Vcoef.names=NULL
   }
 
+  if(ncol(mf)==1) mf <- cbind(mf,1)
   X <- model.matrix(formula, mf[!isNA,]) # Aui Mar 1 2012 account for missings in the random part
 
   y <- y[!isNA]
