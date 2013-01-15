@@ -233,7 +233,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
           if(verbose>=1) cat("\n")
           reg.obj <- reml(gamVals,y,X,V[[1]],V[[2]],verbose=verbose)
           llik <- reg.obj$llik
-          llik <- as.real(llik)
+          llik <- as.double(llik)
           if(verbose>=2) cat(llik,"\n")
           gam <- gamVals[llik==max(llik)]
           gam <- gam[1]
