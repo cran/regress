@@ -1,4 +1,4 @@
-7cc7c9d14d216956bbd9a3e5da54c5dc *DESCRIPTION
+a90d847f4ecd5adc5d7ed411b761c19d *DESCRIPTION
 ae819f1c3869e92dda30ed2006065778 *NAMESPACE
 2a4c30bf6203462f379fd87abe386c72 *R/BLUP.R
 0cfcc1b3eb73a330b648df3389a48fa2 *R/MatrixInversions.R
@@ -7,9 +7,9 @@ b5301ab4575b1e85bafb8968fb88ded4 *R/printSummary.R
 c1f18467f75309a8e262a4c309b68917 *R/regress.R
 259f4035724ff8d00417fd290bdc87d1 *R/reml.R
 a3af71fb4b5cab1754ff388aee7cedff *inst/CITATION
-dd42a2dd28b5813acd7327d2e2071c5f *man/regress.Rd
+46946bce1565d0e04e004fb1b79b16af *man/regress.Rd
 e385c9d40393bd0e0d82417697f5451e *tests/BLUP.tests.R
 a4be1adf3b5c158f76f3f0fb1ccf097f *tests/OLS.r
 17ed5388a525d7499d420fede3f7ae96 *tests/predictionVariance.r
-3501626d1480e125ad9a97a21b29691f *tests/regress.tests.R
-43c16f4f65bee08544cdbd3ef3a0b442 *tests/regressPaper.R
+66425d39f53bd606321c62210e4e2f7e *tests/regress.tests.R
+3bcd7935b4caad81cc697b3a1439d029 *tests/regressPaper.R

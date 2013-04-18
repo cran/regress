@@ -7,7 +7,7 @@ if(FALSE) {
     library(regress)
 }
 
-library("MASS") ## needed for mvrnorm
+library(MASS) ## needed for mvrnorm
 n <- 100
 mu <- c(1,2)
 Sigma <- matrix(c(10,5,5,10),2,2)

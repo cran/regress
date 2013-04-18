@@ -17,11 +17,6 @@
   effects model the matrix iversion is computed using the Sherman Morrison
   Woodbury identities.}
 
-\synopsis{regress(formula, Vformula, identity=TRUE, kernel=NULL,
-                    start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
-                    maxcyc=50, tol=1e-4, data,
-                    fraction=NULL,print.level=NULL)}
-
 \usage{regress(formula, Vformula, identity=TRUE, kernel=NULL,
                     start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
                     maxcyc=50, tol=1e-4, data,
@@ -190,8 +185,8 @@
   ######################
 
   ## Example of Random Effects model from Venables and Ripley, page 205
-  library("nlme")
-  library("regress")
+  library(nlme)
+  library(regress)
 
   citation("regress")
 
