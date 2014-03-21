@@ -8,19 +8,20 @@
 
 \description{Fits Gaussian linear models in which the covariance
   structure can be expressed as a linear combination of known matrices.
-  For example, block effects models and spatial models that include a
-  nugget effect.  Fits model by maximising the residual log likelihood,
-  also known as the REML log likelihood or restricted log likelihood.
-  Uses a Newton-Raphson algorithm to maximise the residual log
-  likelihood. Some computational efficiencies are achieve when all
-  variance components are associated with factors. In such a random
-  effects model the matrix iversion is computed using the Sherman Morrison
-  Woodbury identities.}
+  For example, random effects, block effects models and spatial models
+  that include a nugget effect.  Fits model by maximising the
+  log-likelihood of the model. The choice of kernel affects which
+  likelihood and by default it is the REML log likelihood or restricted
+  log likelihood but the ordinary log-likelihood is also possible. The
+  regress algorithm uses a Newton-Raphson algorithm to locate the
+  maximum of the log-likelihood surface. Some computational efficiencies
+  are achieved when all variance components are associated with
+  factors. In such a random effects model the matrix inversion is
+  computed using the Sherman-Morrison-Woodbury identities.}
 
 \usage{regress(formula, Vformula, identity=TRUE, kernel=NULL,
                     start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
-                    maxcyc=50, tol=1e-4, data,
-                    fraction=NULL,print.level=NULL)}
+                    maxcyc=50, tol=1e-4, data)}
 
 \arguments{
   \item{formula}{ a symbolic description of the model to be fitted. The
@@ -35,7 +36,8 @@
   observation TY where T has this kernel. Default value of NULL assumes
   that the kernal matches the fixed effects model matrix X corresponding
   to REML. Setting kernel=0 gives the ordinary likelihood and kernel=1
-  gives the one dimensional subspace of constant vectors.}
+  gives the one dimensional subspace of constant vectors. See examples
+  for more details.}
   \item{start}{Specify the variance components at which the
     Newton-Raphson algorithm starts.  Default value is
     \code{rep(var(y),k)}.}
@@ -48,7 +50,7 @@
   \item{verbose}{Controls level of time output, takes values 0, 1 or
     2, Default is 0, level 1 gives parameter estimates and value of log
     likelihood at each stage.}
-  \item{gamVals}{When k=2, the marginial log likelihood based on the
+  \item{gamVals}{When k=2, the marginal log likelihood based on the
     residual configuration statistic (see Tunnicliffe Wilson(1989)), is
     evaluated first at \code{(1-gam) V1 + gam V2} for each value of
     \code{gam} in \code{gamVals}, a set of values from the unit
@@ -60,18 +62,20 @@
     50. A warning is output to the screen if this is reached before
     convergence.}
   \item{tol}{Convergence criteria.  If the change in residual log
-    likelihood for one cycle is less than \code{tol} the algorithm
-    finishes.  Default value is \code{1e-4}.}
+    likelihood for one cycle is less than \code{10 x tol} the algorithm
+    finishes.  If each component of the change proposed by the
+  Newton-Raphson is lower in magnitude than \code{tol} the algorithm
+  finishes. Default value is \code{1e-4}.}
   \item{data}{an optional data frame containing the variables in the model.
     By default the variables are taken from 'environment(formula)',
     typically the environment from which 'regress' is called.}
-  \item{fraction}{Deprecated, see taper}
-  \item{print.level}{Deprecated}
 }
 
 \details{
-  As the code is running it outputs the variance components, and
-  the residual log likelihood at each iteration.
+
+  As the code is running it can output the variance components, and the
+  residual log likelihood at each iteration when \code{verbose} is
+  non-zero.
 
   To avoid confusion over terminology.  I define variance components to
   be the multipliers of the matrices and variance parameters to the
@@ -112,11 +116,16 @@
   the kernel of T is K.  So if you set kernel=0, you get the ordinary
   likelihood ratio based on the complete observation $y$; And if you set
   kernel=1, you get the likelihood ratio based on simple contrasts $y_i
-  - y_j$ only.  So in the latter case, you have only $n-1$ degrees of
+  - y_j$ only. In the latter case, you have only $n-1$ degrees of
   freedom to work with.  And if you set kernel=X0, you get the
   likelihood ratio based on contrasts $Ty$ with kernel $X0$, which for
   fit0 is the REML likelihood.
 
+  We recommend fitting the models with the "largest" kernel possible.
+  For example, with models fit0 and fit1 above, we could choose K=0, or
+  K=X0 to get the desired result. Our experience though is that the
+  model with K=X0 may be easier to fit with regress compared with a
+  model where K=0. 
   }
 
 \value{
@@ -267,15 +276,7 @@
   ## Examples of use of kernel
   ############################
 
-  ## LRT for z2 using ordinary likelihood
-  with(regressDF,{
-       K <- 0
-       model1 <- regress(y~1+x1,~z1,kernel=K)
-       model2 <- regress(y~1+x1+x2,~z1,kernel=K)
-       2*(model2$llik - model1$llik)
-  })
-
-  ## REML LRT for z2
+  ## REML LRT for x2 which will be 0 as x2 lies in the kernel
   with(regressDF,{
        K <- model.matrix(~1+x1+x2)
        model1 <- regress(y~1+x1,~z1,kernel=K)
@@ -283,12 +284,34 @@
        2*(model2$llik - model1$llik)
   })
 
-  ## LRT for x2 based on a reduced observation TY with kernel K
+  ## LRT for x2 using ordinary likelihood
+  with(regressDF,{
+       K <- 0
+       model1 <- regress(y~1+x1,~z1,kernel=K)
+       model2 <- regress(y~1+x1+x2,~z1,kernel=K)
+       2*(model2$llik - model1$llik)
+  })
+
+  ## LRT for x2 based on a reduced observation TY with kernel K. This
+  ## LRT is approximately equal to the last one, and numerically this
+  ## turns out to be the case also.
   with(regressDF,{
        K <- model.matrix(~1+x1)
        model1 <- regress(y~1+x1,~z1,kernel=K)
        model2 <- regress(y~1+x1+x2,~z1,kernel=K)
        2*(model2$llik - model1$llik)
+  })
+
+  ## Two ways to drop out the 17th and 19th observations.
+  with(regressDF,{
+       n <- length(y)
+       K <- matrix(0,n,2)
+       K[17,1] <- K[19,2] <- 1
+       model1 <- regress(y~1+x1,~z1,kernel=K,tol=1e-8)
+       drop <- c(17,19)
+       model2 <- regress(y[-drop]~1+x1[-drop],~z1[-drop],kernel=0,tol=1e-8)
+       print(model1)
+       print(model2)
   })
 
   rm(regressDF, regress.output)

@@ -1,21 +1,12 @@
 regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
                     start=NULL, taper=NULL, pos, verbose=0, gamVals=NULL,
-                    maxcyc=50, tol=1e-4, data,
-                    fraction=NULL,print.level=NULL){
+                    maxcyc=50, tol=1e-4, data){
 
   ## Vformula can just be something like ~ V0 + V1
   ## or leave it out or Vformula=NULL
   ## assume its in the form ~ V1 + V2 + ... + Vn or missing or Vformula=NULL
   ## for random effects and random interactions for factors A and B include
   ## ~ A + B + I(A:B)
-
-  if(!is.null(print.level)) {
-    cat("\nWarning: print.level has been replaced by verbose and has been deprecated.\nIt will be removed in the next version of regress\n\n")
-    verbose <- print.level
-  }
-  if(!is.null(print.level)) {
-      cat("\nWarning: fraction has been deprecated and replaced by taper - a vector of values from 0 to 1 giving a unique fraction for each step of the Newton Raphson algorithm.\n")
-  }
 
   if(verbose>9) cat("Extracting objects from call\n")
   if(missing(data)) data <- environment(formula)
@@ -24,8 +15,6 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   y <- model.response(mf)
 
   model <- list()
-  ##model$formula <- formula
-  ##model$Vformula <- Vformula
   model <- c(model,mf)
 
   if(missing(Vformula)) Vformula <- NULL
@@ -147,13 +136,10 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   In <- diag(rep(1,n),n,n)
 
   if(identity) {
-      ##if(k) for(i in k:1) V[[i+1]] <- V[[i]]
-      ##V[[1]] <- In
       V[[k+1]] <- as.factor(1:n)
       names(V)[k+1] <- "In"
       k <- k+1
 
-      ##Vcoef.names <- c("Id",Vcoef.names)
       Vcoef.names <- c(Vcoef.names,"In")
       Vformula <- as.character(Vformula)
       Vformula[1] <- "~"
@@ -301,13 +287,10 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
           sigma[ind] <- exp(coef[ind])
       }
 
-      if(verbose>=1) {
+      if(verbose) {
           cat(cycle, "sigma =",sigma)
           ##cat(sigma)
       }
-
-      ##Sigma <- matrix(0,dim(V[[1]])[1],dim(V[[1]])[2])
-      ## if(verbose>9) cat("Sherman Morrison Woodbury",SWsolveINDICATOR,"\n")
 
       if(!SWsolveINDICATOR) {
           Sigma <- 0
@@ -341,7 +324,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
 
       eig <- sort(eigen(WQK,symmetric=TRUE,only.values=TRUE)$values, decreasing=TRUE)[1:rankQK]
       if(any(eig < 0)){
-          cat("error: Sigma is not pos def on contrasts: range(eig)=", range(eig), "\n")
+          cat("error: Sigma is not positive definite on contrasts: range(eig)=", range(eig), "\n")
           WQK <- WQK + (tol - min(eig))*diag(nobs)
           eig <- eig + tol - min(eig)
       }
@@ -351,15 +334,15 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       delta.llik <- llik - llik0
       llik0 <- llik
 
-      if(verbose && reml) cat(" resid llik =", llik,"\n")
-      if(verbose && !reml) cat(" llik =", llik, "\n")
-
-      if(verbose) cat(cycle, "adjusted sigma =",sigma)
-      if(cycle>1) {
-          if(verbose && reml) cat(" delta.llik =", delta.llik, "\n")
-          if(verbose && !reml) cat(" delta.llik =", delta.llik, "\n")
-      } else cat("\n")
-
+      ## From Jean-Luc Jannick to fix excess carriage returns
+      if (verbose){
+        if (reml) cat(" resid llik =", llik, "\n") else cat(" llik =", llik, "\n")
+        cat(cycle, "adjusted sigma =", sigma)
+        if (cycle > 1){
+          if (reml) cat(" delta.llik =", delta.llik, "\n") else cat(" delta.llik =", delta.llik, "\n")
+        } else cat("\n")
+      }
+      
       ## now the fun starts, derivative and expected fisher info
       ## the 0.5 multiple is ignored, it is in both and they cancel
 
@@ -390,17 +373,6 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
           } else {
               for(ii in 1:k) T[[ii]] <- tcrossprod(WQK %*% Z[[ii]],Z[[ii]])
           }
-
-          ##if(k>=6) {
-          ##    ## One line to do all - may be memory inefficient though
-          ##    T <- lapply(Z,function(x) tcrossprod(WQ %*% x, x))
-          ##} else {
-          ##    if(k>=1) T[[1]] <- tcrossprod(WQ %*% Z[[1]], Z[[1]])
-          ##    if(k>=2) T[[2]] <- tcrossprod(WQ %*% Z[[2]], Z[[2]])
-          ##    if(k>=3) T[[3]] <- tcrossprod(WQ %*% Z[[3]], Z[[3]])
-          ##    if(k>=4) T[[4]] <- tcrossprod(WQ %*% Z[[4]], Z[[4]])
-          ##    if(k>=5) T[[5]] <- tcrossprod(WQ %*% Z[[5]], Z[[5]])
-          ##}
       }
 
 
@@ -439,7 +411,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       ##}
 
       stats <- c(stats, llik, sigma[1:k], x[1:k])
-      if(verbose==-1) {
+      if(verbose>=9) {
           ##cat(c(rllik1, rllik2, sigma[1:k], x[1:k]),"\n")
       }
 
