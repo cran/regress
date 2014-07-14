@@ -27,7 +27,7 @@ lm.D90 <- lm(weight ~ group - 1) # omitting intercept
 rg.D9 <- regress(weight ~ group)
 rg.D90 <- regress(weight ~ group - 1)
 
-if( sum((coef(lm.D9) - rg.D9$beta)^2 + (coef(lm.D90) - rg.D90$beta)^2 > 1e-10) stop("Error with Ordinary Least Squares")
+if( sum((coef(lm.D9) - rg.D9$beta)^2 + (coef(lm.D90) - rg.D90$beta)^2 > 1e-10)) stop("Error with Ordinary Least Squares")
 
 if(abs(anova(lm.D9)[2,3] - rg.D9$sigma) > 1e-10) stop("Error with Ordinary Least Squares (variance)")
 if(abs(anova(lm.D90)[2,3] - rg.D90$sigma) > 1e-10) stop("Error with Ordinary Least Squares (variance)")

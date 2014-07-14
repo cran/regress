@@ -155,6 +155,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   ## pos = c(1,1,0) means first two parameters are positive, third is either
   if(!missing(pos)) pos <- as.logical(pos)
   if(missing(pos)) pos <- rep(FALSE,k)
+  if(length(pos) < k) cat("Warning: argument pos is only partially specified; additional terms (n=",k-length(pos),") set to FALSE internally.\n",sep="")
   pos <- c(pos,rep(FALSE,k))
   pos <- pos[1:k]
 
@@ -528,10 +529,21 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   ##  for(j in 1:dim(FI)[2])
   ##    FI.c[i,j] <- FI[i,j]/(((sigma[i]-1)*pos[i]+1)*((sigma[j]-1)*pos[j]+1))
 
-  sigma.cov <- ginv(FI.c)
   names(sigma) <- Vcoef.names
+  sigma.cov <- try(ginv(FI.c),silent=TRUE)
+  error1 <- (class(sigma.cov)=="try-error")
+  if(error1) {
+    cat("Warning: solution lies on the boundary; check sigma & pos\nNo standard errors for variance components returned\n")
+    sigma.cov <- matrix(NA,k,k)
+  }
   rownames(sigma.cov) <- colnames(sigma.cov) <- Vcoef.names
 
+  ## Additional warning if any pos entries are TRUE and the corresponding term is close to zero
+  ## Only give this warning it I haven't given the previous one.
+  if(!error1) {
+    if(any(sigma[pos]^2 < 1e-4)) cat("Warning: solution lies close to zero for some positive variance components, their standard errors may not be valid\n")
+  }
+  
   result <- list(trace=stats, llik=llik, cycle=cycle, rdf=rankQ,
                  beta=beta, beta.cov=beta.cov, beta.se=beta.se,
                  sigma=sigma[1:k], sigma.cov=sigma.cov[1:k,1:k], W=W,
