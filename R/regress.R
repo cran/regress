@@ -144,7 +144,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       Vformula <- as.character(Vformula)
       Vformula[1] <- "~"
       Vformula[2] <- paste(Vformula[2],"+In")
-      Vformula <- as.formula(Vformula)
+      Vformula <- as.formula(paste(Vformula, collapse=" "))
   }
 
   model <- c(model,V)
@@ -326,7 +326,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
       eig <- sort(eigen(WQK,symmetric=TRUE,only.values=TRUE)$values, decreasing=TRUE)[1:rankQK]
       if(any(eig < 0)){
           cat("error: Sigma is not positive definite on contrasts: range(eig)=", range(eig), "\n")
-          WQK <- WQK + (tol - min(eig))*diag(nobs)
+          WQK <- WQK + (tol - min(eig))*diag(n)
           eig <- eig + tol - min(eig)
       }
       ldet <- sum(log(eig))
@@ -343,7 +343,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
           if (reml) cat(" delta.llik =", delta.llik, "\n") else cat(" delta.llik =", delta.llik, "\n")
         } else cat("\n")
       }
-      
+
       ## now the fun starts, derivative and expected fisher info
       ## the 0.5 multiple is ignored, it is in both and they cancel
 
@@ -531,7 +531,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
 
   names(sigma) <- Vcoef.names
   sigma.cov <- try(ginv(FI.c),silent=TRUE)
-  error1 <- (class(sigma.cov)=="try-error")
+  error1 <- (inherits(sigma.cov, "try-error"))
   if(error1) {
     cat("Warning: solution lies on the boundary; check sigma & pos\nNo standard errors for variance components returned\n")
     sigma.cov <- matrix(NA,k,k)
@@ -543,7 +543,7 @@ regress <- function(formula, Vformula, identity=TRUE, kernel=NULL,
   if(!error1) {
     if(any(sigma[pos]^2 < 1e-4)) cat("Warning: solution lies close to zero for some positive variance components, their standard errors may not be valid\n")
   }
-  
+
   result <- list(trace=stats, llik=llik, cycle=cycle, rdf=rankQ,
                  beta=beta, beta.cov=beta.cov, beta.se=beta.se,
                  sigma=sigma[1:k], sigma.cov=sigma.cov[1:k,1:k], W=W,
