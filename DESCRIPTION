@@ -1,6 +1,6 @@
 Package: regress
-Version: 1.3-21
-Date: 2020-06-17
+Version: 1.3-22
+Date: 2025-05-09
 Title: Gaussian Linear Models with Linear Covariance Structure
 Authors@R: c(person("David", "Clifford", role="aut"),
              person("Peter", "McCullagh", role="aut"),
@@ -11,7 +11,8 @@ Authors@R: c(person("David", "Clifford", role="aut"),
 Author: David Clifford [aut],
   Peter McCullagh [aut],
   HJ Auinger [ctb],
-  Karl W Broman [ctb, cre] (<https://orcid.org/0000-0002-4914-6671>)
+  Karl W Broman [ctb, cre] (ORCID:
+    <https://orcid.org/0000-0002-4914-6671>)
 Maintainer: Karl W Broman <broman@wisc.edu>
 Description: Functions to fit Gaussian linear model by maximising the
         residual log likelihood where the covariance structure can be
@@ -33,6 +34,6 @@ Suggests: nlme, MASS
 Encoding: UTF-8
 ByteCompile: true
 NeedsCompilation: no
-Packaged: 2020-06-17 13:39:03 UTC; kbroman
+Packaged: 2025-05-09 14:05:05 UTC; kbroman
 Repository: CRAN
-Date/Publication: 2020-06-18 17:50:02 UTC
+Date/Publication: 2025-05-09 15:50:02 UTC
